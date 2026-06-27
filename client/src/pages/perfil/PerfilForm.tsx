@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { GoBack } from '@/components/shared/GoBack'
 import { useState } from 'react'
 
 const schema = z.object({
@@ -40,6 +41,8 @@ export default function PerfilForm() {
   })
 
   return (
+    <div className="space-y-4">
+      <GoBack />
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>Mi perfil</CardTitle></CardHeader>
       <CardContent>
@@ -72,5 +75,6 @@ export default function PerfilForm() {
         </form>
       </CardContent>
     </Card>
+    </div>
   )
 }

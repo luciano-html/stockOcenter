@@ -10,13 +10,14 @@ import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Plus, Eye } from 'lucide-react'
 import { useState } from 'react'
+import { GoBack } from '@/components/shared/GoBack'
 
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  pendiente: 'secondary',
-  en_progreso: 'default',
-  pausada: 'outline',
-  finalizada: 'secondary',
-  cancelada: 'destructive',
+const statusClass: Record<string, string> = {
+  pendiente: 'bg-gray-100 text-gray-700 border-gray-300',
+  en_progreso: 'bg-blue-100 text-blue-700 border-blue-300',
+  pausada: 'bg-amber-100 text-amber-700 border-amber-300',
+  finalizada: 'bg-green-100 text-green-700 border-green-300',
+  cancelada: 'bg-red-100 text-red-700 border-red-300',
 }
 
 export default function OrdenesTrabajoList() {
@@ -34,6 +35,7 @@ export default function OrdenesTrabajoList() {
 
   return (
     <div className="space-y-4">
+      <GoBack />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <Select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} className="w-48">
           <option value="">Todos los estados</option>
@@ -69,7 +71,7 @@ export default function OrdenesTrabajoList() {
                 <TableCell className="font-medium">{ot.chairTypeId.name}</TableCell>
                 <TableCell>{ot.quantity}</TableCell>
                 <TableCell>
-                  <Badge variant={statusColors[ot.status]}>
+                  <Badge variant="outline" className={statusClass[ot.status]}>
                     {ot.status.replace('_', ' ')}
                   </Badge>
                 </TableCell>

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
+import { GoBack } from '@/components/shared/GoBack'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 
@@ -58,6 +59,7 @@ export default function UsuariosList() {
 
   return (
     <div className="space-y-4">
+      <GoBack />
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">{data?.data.length ?? 0} usuarios</p>
         <Button onClick={() => setOpen(true)}><Plus size={16} /> Nuevo usuario</Button>

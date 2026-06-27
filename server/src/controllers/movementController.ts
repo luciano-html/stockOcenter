@@ -17,6 +17,7 @@ export async function list(req: Request, res: Response) {
   const total = await StockMovement.countDocuments(filter);
   const movimientos = await StockMovement.find(filter)
     .populate('componentId', 'name unit')
+    .populate('referenceId', 'chairTypeId quantity')
     .sort({ createdAt: -1 })
     .skip((Number(page) - 1) * Number(limit))
     .limit(Number(limit));

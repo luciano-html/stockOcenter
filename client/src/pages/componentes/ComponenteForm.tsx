@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { GoBack } from '@/components/shared/GoBack'
 
 const schema = z.object({
   name: z.string().min(1, 'Requerido'),
   description: z.string().optional(),
   tipo: z.string().min(1, 'Requerido'),
+  subtipo: z.string().optional(),
   marca: z.string().optional(),
   unit: z.string().min(1, 'Requerido'),
   stockMinimo: z.coerce.number().min(0, 'No puede ser negativo'),
@@ -45,6 +47,7 @@ export default function ComponenteForm() {
       name: data.data.name,
       description: data.data.description ?? '',
       tipo: data.data.tipo,
+      subtipo: data.data.subtipo ?? '',
       marca: data.data.marca,
       unit: data.data.unit,
       stockMinimo: data.data.stockMinimo,
@@ -64,6 +67,8 @@ export default function ComponenteForm() {
   if (isEdit && isLoading) return <Skeleton className="h-64" />
 
   return (
+    <div className="space-y-4">
+      <GoBack />
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>{isEdit ? 'Editar componente' : 'Nuevo componente'}</CardTitle></CardHeader>
       <CardContent>
@@ -77,7 +82,7 @@ export default function ComponenteForm() {
             <Label htmlFor="description">Descripción</Label>
             <Input id="description" {...register('description')} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo</Label>
               <Input id="tipo" list="tipos-list" placeholder="Escribí o seleccioná..." {...register('tipo')} />
@@ -85,6 +90,13 @@ export default function ComponenteForm() {
                 {filtrosData?.data.tipos.map((t) => <option key={t} value={t} />)}
               </datalist>
               {errors.tipo && <p className="text-xs text-destructive">{errors.tipo.message}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subtipo">Sub-tipo</Label>
+              <Input id="subtipo" list="subtipos-list" placeholder="Opcional..." {...register('subtipo')} />
+              <datalist id="subtipos-list">
+                {filtrosData?.data.subTipos.map((s) => <option key={s} value={s} />)}
+              </datalist>
             </div>
             <div className="space-y-2">
               <Label htmlFor="marca">Marca</Label>
@@ -114,5 +126,6 @@ export default function ComponenteForm() {
         </form>
       </CardContent>
     </Card>
+    </div>
   )
 }

@@ -1,5 +1,6 @@
-import { Component, BOMItem, StockMovement } from '../models';
+import { Component, BOMItem, StockMovement, ChairType, WorkOrder } from '../models';
 import { ApiError } from '../utils/ApiError';
+import type { IWorkOrderItem } from '../models/WorkOrder';
 
 const TRANSITIONS: Record<string, string[]> = {
   pendiente: ['en_progreso', 'cancelada'],
@@ -13,17 +14,30 @@ export function canTransition(from: string, to: string): boolean {
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-export async function reservarStock(chairTypeId: string, quantity: number) {
+async function getItems(chairTypeId: string, quantity: number, items?: IWorkOrderItem[]) {
   const bom = await BOMItem.find({ chairTypeId });
-  if (!bom.length) throw ApiError.badRequest('El tipo de silla no tiene BOM definido');
+  const bomItems = bom.map((item) => ({
+    componentId: item.componentId,
+    quantity: item.quantity * quantity,
+  }));
+  const extras = (items ?? []).map((i) => ({
+    componentId: i.componentId,
+    quantity: i.quantity,
+  }));
+  return [...bomItems, ...extras];
+}
+
+export async function reservarStock(chairTypeId: string, quantity: number, items?: IWorkOrderItem[]) {
+  const compList = await getItems(chairTypeId, quantity, items);
+  if (!compList.length) throw ApiError.badRequest('La orden no tiene componentes definidos');
 
   const updates: { componentId: string; name: string; disponible: number; necesario: number }[] = [];
 
-  for (const item of bom) {
+  for (const item of compList) {
     const comp = await Component.findById(item.componentId);
     if (!comp) throw ApiError.notFound(`Componente ${item.componentId} no encontrado`);
 
-    const necesario = item.quantity * quantity;
+    const necesario = item.quantity;
     const disponible = comp.stockActual - comp.stockReservado;
 
     if (disponible < necesario) {
@@ -43,38 +57,38 @@ export async function reservarStock(chairTypeId: string, quantity: number) {
     throw ApiError.badRequest(`Stock insuficiente: ${detalles}`);
   }
 
-  for (const item of bom) {
+  for (const item of compList) {
     await Component.findByIdAndUpdate(item.componentId, {
-      $inc: { stockReservado: item.quantity * quantity },
+      $inc: { stockReservado: item.quantity },
     });
   }
 }
 
-export async function descontarStock(chairTypeId: string, quantity: number, workOrderId: string) {
-  const bom = await BOMItem.find({ chairTypeId });
+export async function descontarStock(chairTypeId: string, quantity: number, workOrderId: string, items?: IWorkOrderItem[]) {
+  const compList = await getItems(chairTypeId, quantity, items);
+  const chairType = await ChairType.findById(chairTypeId);
 
-  for (const item of bom) {
-    const cantidad = item.quantity * quantity;
+  for (const item of compList) {
     await Component.findByIdAndUpdate(item.componentId, {
-      $inc: { stockActual: -cantidad, stockReservado: -cantidad },
-    });
-    await StockMovement.create({
-      componentId: item.componentId,
-      type: 'egreso',
-      quantity: cantidad,
-      referenceType: 'work-order',
-      referenceId: workOrderId,
-      notes: `OT #${workOrderId.slice(-6)}`,
+      $inc: { stockActual: -item.quantity, stockReservado: -item.quantity },
     });
   }
+
+  await StockMovement.create({
+    type: 'egreso',
+    quantity,
+    referenceType: 'work-order',
+    referenceId: workOrderId,
+    notes: `Silla ${chairType?.name ?? ''} x${quantity} (OT #${workOrderId.slice(-6)})`,
+  });
 }
 
-export async function liberarReserva(chairTypeId: string, quantity: number) {
-  const bom = await BOMItem.find({ chairTypeId });
+export async function liberarReserva(chairTypeId: string, quantity: number, items?: IWorkOrderItem[]) {
+  const compList = await getItems(chairTypeId, quantity, items);
 
-  for (const item of bom) {
+  for (const item of compList) {
     await Component.findByIdAndUpdate(item.componentId, {
-      $inc: { stockReservado: -(item.quantity * quantity) },
+      $inc: { stockReservado: -item.quantity },
     });
   }
 }

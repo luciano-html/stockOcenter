@@ -22,18 +22,18 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       {open && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />}
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-full w-64 bg-sidebar-background border-r border-sidebar-border transition-transform md:relative md:translate-x-0',
+          'fixed top-0 left-0 z-50 h-full w-64 bg-sidebar-background border-r border-sidebar-border transition-transform md:relative md:translate-x-0 flex flex-col',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          <span className="font-bold text-lg text-sidebar-primary">Stock OC</span>
+          <span className="font-bold text-lg text-sidebar-primary font-heading">Stock OC</span>
           <button onClick={onClose} className="md:hidden text-sidebar-foreground cursor-pointer">
             <X size={20} />
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {links.map((link) => (
             <NavLink
               key={link.to}
@@ -55,7 +55,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           ))}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border space-y-1">
+        <div className="p-4 border-t border-sidebar-border space-y-1 mt-auto">
           {isAdmin && (
             <NavLink
               to="/usuarios"

@@ -3,6 +3,7 @@ export interface Componente {
   name: string
   description?: string
   tipo: string
+  subtipo?: string
   marca?: string
   unit: string
   stockActual: number
@@ -16,6 +17,7 @@ export interface Componente {
 
 export interface ComponenteFiltros {
   tipos: string[]
+  subTipos: string[]
   marcas: string[]
 }
 
@@ -36,6 +38,7 @@ export interface BOMItem {
 export interface ChairTypeWithBOM extends ChairType {
   bom: BOMItem[]
   bomCount?: number
+  sillasPosibles?: number
 }
 
 export interface WorkOrder {
@@ -48,13 +51,18 @@ export interface WorkOrder {
   finalizedAt?: string
 }
 
+export interface WorkOrderDetalle {
+  orden: WorkOrder
+  items: { componentId: { _id: string; name: string; unit: string; tipo: string; subtipo?: string; marca?: string }; quantity: number; unit: string; tipo: 'bom' | 'adicional' | 'repuesto' }[]
+}
+
 export interface StockMovement {
   _id: string
-  componentId: { _id: string; name: string; unit: string }
+  componentId?: { _id: string; name: string; unit: string }
   type: 'ingreso' | 'egreso'
   quantity: number
   referenceType?: 'work-order'
-  referenceId?: string
+  referenceId?: { _id: string; chairTypeId: { name: string }; quantity: number }
   notes?: string
   createdAt: string
 }

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useState } from 'react'
 import { Search } from 'lucide-react'
+import { GoBack } from '@/components/shared/GoBack'
 
 export default function MovimientosList() {
   const [params, setParams] = useState({ componenteId: '', tipo: '', page: 1 })
@@ -28,6 +29,7 @@ export default function MovimientosList() {
 
   return (
     <div className="space-y-4">
+      <GoBack />
       <div className="flex flex-col sm:flex-row gap-2 items-end">
         <div className="w-full sm:w-48">
           <Select value={params.componenteId} onChange={(e) => setParams({ ...params, componenteId: e.target.value })}>

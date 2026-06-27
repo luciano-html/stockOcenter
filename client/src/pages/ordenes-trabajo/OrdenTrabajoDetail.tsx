@@ -1,14 +1,16 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/services/api'
-import type { WorkOrder } from '@/types'
+import type { WorkOrder, WorkOrderDetalle } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useState } from 'react'
-import { ArrowLeft, Play, Pause, CheckCircle, XCircle } from 'lucide-react'
+import { Play, Pause, CheckCircle, XCircle } from 'lucide-react'
+import { GoBack } from '@/components/shared/GoBack'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 const statusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
@@ -18,12 +20,12 @@ const statusLabels: Record<string, string> = {
   cancelada: 'Cancelada',
 }
 
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  pendiente: 'secondary',
-  en_progreso: 'default',
-  pausada: 'outline',
-  finalizada: 'secondary',
-  cancelada: 'destructive',
+const statusClass: Record<string, string> = {
+  pendiente: 'bg-gray-100 text-gray-700 border-gray-300',
+  en_progreso: 'bg-blue-100 text-blue-700 border-blue-300',
+  pausada: 'bg-amber-100 text-amber-700 border-amber-300',
+  finalizada: 'bg-green-100 text-green-700 border-green-300',
+  cancelada: 'bg-red-100 text-red-700 border-red-300',
 }
 
 const transitions: Record<string, { status: string; label: string; variant: 'default' | 'destructive' | 'secondary'; icon: typeof Play }[]> = {
@@ -53,12 +55,20 @@ export default function OrdenTrabajoDetail() {
     queryFn: () => api.get(`/ordenes-trabajo/${id}`).then((r) => r.data),
   })
 
+  const { data: detalleData } = useQuery<{ data: WorkOrderDetalle }>({
+    queryKey: ['orden-trabajo-detalle', id],
+    queryFn: () => api.get(`/ordenes-trabajo/${id}/detalle`).then((r) => r.data),
+    enabled: !!data?.data,
+  })
+
   const mutation = useMutation({
     mutationFn: (status: string) => api.patch(`/ordenes-trabajo/${id}/estado`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orden-trabajo', id] })
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
       queryClient.invalidateQueries({ queryKey: ['stock-resumen'] })
+      queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo-dash'] })
+      queryClient.invalidateQueries({ queryKey: ['movimientos-recent-dash'] })
       setConfirmStatus(null)
     },
   })
@@ -71,16 +81,14 @@ export default function OrdenTrabajoDetail() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Button variant="ghost" onClick={() => navigate('/ordenes-trabajo')} className="mb-2">
-        <ArrowLeft size={16} /> Volver
-      </Button>
+      <GoBack />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
               OT #{ot._id.slice(-6)}
-              <Badge variant={statusColors[ot.status]}>{statusLabels[ot.status]}</Badge>
+              <Badge variant="outline" className={statusClass[ot.status]}>{statusLabels[ot.status]}</Badge>
             </CardTitle>
           </div>
         </CardHeader>
@@ -121,6 +129,42 @@ export default function OrdenTrabajoDetail() {
           )}
         </CardContent>
       </Card>
+
+      {detalleData?.data.items && detalleData.data.items.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Componentes</CardTitle></CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Componente</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Sub-tipo</TableHead>
+                    <TableHead>Cantidad</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detalleData.data.items.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium">{item.componentId.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{item.componentId.tipo}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{item.componentId.subtipo ?? '—'}</TableCell>
+                      <TableCell>{item.quantity} {item.unit}</TableCell>
+                      <TableCell>
+                        {item.tipo === 'bom' && <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 bg-blue-50">Silla</Badge>}
+                        {item.tipo === 'adicional' && <Badge variant="outline" className="text-xs border-purple-300 text-purple-700 bg-purple-50">Adicional</Badge>}
+                        {item.tipo === 'repuesto' && <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">Repuesto</Badge>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={!!confirmStatus} onOpenChange={() => setConfirmStatus(null)}>
         <DialogHeader>

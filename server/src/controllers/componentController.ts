@@ -28,7 +28,7 @@ export async function reservas(_req: Request, res: Response) {
 }
 
 export async function list(_req: Request, res: Response) {
-  const { search, stockBajo, tipo, marca } = _req.query as Record<string, string | undefined>;
+  const { search, stockBajo, tipo, subtipo, marca } = _req.query as Record<string, string | undefined>;
 
   const filter: Record<string, unknown> = {};
   if (search) {
@@ -38,6 +38,7 @@ export async function list(_req: Request, res: Response) {
     filter.$expr = { $lte: ['$stockActual', '$stockMinimo'] };
   }
   if (tipo) filter.tipo = tipo;
+  if (subtipo) filter.subtipo = subtipo;
   if (marca) filter.marca = marca;
 
   const componentes = await Component.find(filter).sort({ name: 1 });
@@ -80,9 +81,10 @@ export async function remove(req: Request, res: Response) {
 }
 
 export async function filtros(_req: Request, res: Response) {
-  const [tipos, marcas] = await Promise.all([
+  const [tipos, subTipos, marcas] = await Promise.all([
     Component.distinct('tipo', { tipo: { $ne: null } }),
+    Component.distinct('subtipo', { subtipo: { $ne: null } }),
     Component.distinct('marca', { marca: { $ne: null } }),
   ]);
-  res.json({ data: { tipos: tipos.sort(), marcas: marcas.sort() } });
+  res.json({ data: { tipos: tipos.sort(), subTipos: subTipos.sort(), marcas: marcas.sort() } });
 }

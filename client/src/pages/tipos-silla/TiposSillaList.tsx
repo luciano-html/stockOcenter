@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { GoBack } from '@/components/shared/GoBack'
 
 export default function TiposSillaList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -30,6 +31,7 @@ export default function TiposSillaList() {
 
   return (
     <div className="space-y-4">
+      <GoBack />
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">{data?.data.length ?? 0} tipos</p>
         {isAdmin && (
@@ -45,6 +47,7 @@ export default function TiposSillaList() {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Componentes en lista</TableHead>
+              <TableHead>Posibles</TableHead>
               <TableHead>Activo</TableHead>
               {isAdmin && <TableHead className="w-24">Acciones</TableHead>}
             </TableRow>
@@ -56,6 +59,7 @@ export default function TiposSillaList() {
                 <TableCell className="text-sm text-muted-foreground">
                   {t.bomCount ?? 0} componentes
                 </TableCell>
+                <TableCell className="font-bold">{t.sillasPosibles ?? 0}</TableCell>
                 <TableCell>{t.active ? 'Sí' : 'No'}</TableCell>
                 {isAdmin && (
                   <TableCell>

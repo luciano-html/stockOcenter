@@ -14,6 +14,7 @@ router.use(authenticate);
 
 router.get('/', chairTypeController.list);
 router.get('/:id/sillas-posibles', validate(chairTypeParamsSchema, 'params'), chairTypeController.sillasPosibles);
+router.get('/:id/bom-detalle', validate(chairTypeParamsSchema, 'params'), chairTypeController.bomDetalle);
 router.get('/:id', validate(chairTypeParamsSchema, 'params'), chairTypeController.getById);
 router.post('/', authorize('admin'), validate(createChairTypeSchema), chairTypeController.create);
 router.put('/:id', authorize('admin'), validate(chairTypeParamsSchema, 'params'), validate(updateChairTypeSchema), chairTypeController.update);

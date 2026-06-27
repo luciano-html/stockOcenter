@@ -15,6 +15,7 @@ router.use(authenticate);
 
 router.get('/', validate(listWorkOrdersQuerySchema, 'query'), workOrderController.list);
 router.get('/:id', validate(workOrderParamsSchema, 'params'), workOrderController.getById);
+router.get('/:id/detalle', validate(workOrderParamsSchema, 'params'), workOrderController.getDetalle);
 router.post('/', authorize('admin'), validate(createWorkOrderSchema), workOrderController.create);
 router.patch(
   '/:id/estado',

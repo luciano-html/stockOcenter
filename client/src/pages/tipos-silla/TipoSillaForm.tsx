@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { GoBack } from '@/components/shared/GoBack'
 
 const schema = z.object({
   name: z.string().min(1, 'Requerido'),
@@ -78,6 +79,8 @@ export default function TipoSillaForm() {
   if (isEdit && isLoading) return <Skeleton className="h-96" />
 
   return (
+    <div className="space-y-4">
+      <GoBack />
     <Card className="max-w-2xl mx-auto">
       <CardHeader><CardTitle>{isEdit ? 'Editar tipo de silla' : 'Nuevo tipo de silla'}</CardTitle></CardHeader>
       <CardContent className="space-y-6">
@@ -150,5 +153,6 @@ export default function TipoSillaForm() {
         </div>
       </CardContent>
     </Card>
+    </div>
   )
 }

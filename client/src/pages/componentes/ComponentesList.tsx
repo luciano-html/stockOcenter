@@ -13,11 +13,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2, Search, Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
+import { GoBack } from '@/components/shared/GoBack'
 
 export default function ComponentesList() {
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const tipoFiltro = params.get('tipo') ?? ''
+  const subtipoFiltro = params.get('subtipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
@@ -26,11 +28,12 @@ export default function ComponentesList() {
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: Componente[] }>({
-    queryKey: ['componentes', search, tipoFiltro, marcaFiltro],
+    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, marcaFiltro],
     queryFn: () => api.get('/componentes', {
       params: {
         search: search || undefined,
         tipo: tipoFiltro || undefined,
+        subtipo: subtipoFiltro || undefined,
         marca: marcaFiltro || undefined,
       },
     }).then((r) => r.data),
@@ -50,6 +53,7 @@ export default function ComponentesList() {
 
   return (
     <div className="space-y-4">
+      <GoBack />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
@@ -67,6 +71,14 @@ export default function ComponentesList() {
           }} className="w-40">
             <option value="">Todos los tipos</option>
             {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
+          </Select>
+          <Select value={subtipoFiltro} onChange={(e) => {
+            const next = new URLSearchParams(params)
+            e.target.value ? next.set('subtipo', e.target.value) : next.delete('subtipo')
+            setParams(next, { replace: true })
+          }} className="w-40">
+            <option value="">Todos los sub-tipos</option>
+            {filtrosData?.data.subTipos.map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
           <Select value={marcaFiltro} onChange={(e) => { 
             const next = new URLSearchParams(params)
@@ -96,12 +108,12 @@ export default function ComponentesList() {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Tipo</TableHead>
+                <TableHead>Sub-tipo</TableHead>
                 <TableHead>Marca</TableHead>
                 <TableHead>Unidad</TableHead>
-                <TableHead>Actual</TableHead>
                 <TableHead>Reservado</TableHead>
                 <TableHead>Disponible</TableHead>
-                <TableHead>Mínimo</TableHead>
+                <TableHead>Alerta</TableHead>
                 <TableHead>Estado</TableHead>
                 {isAdmin && <TableHead className="w-24">Acciones</TableHead>}
               </TableRow>
@@ -111,9 +123,9 @@ export default function ComponentesList() {
                 <TableRow key={c._id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.subtipo || '—'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.marca || '—'}</TableCell>
                   <TableCell>{c.unit}</TableCell>
-                  <TableCell>{c.stockActual}</TableCell>
                   <TableCell className={c.stockReservado > 0 ? 'text-amber-600 font-bold' : ''}>{c.stockReservado}</TableCell>
                   <TableCell className="font-bold">{c.stockDisponible}</TableCell>
                   <TableCell>{c.stockMinimo}</TableCell>

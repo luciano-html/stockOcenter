@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 export type MovementType = 'ingreso' | 'egreso';
 
 export interface IStockMovement extends Document {
-  componentId: Types.ObjectId;
+  componentId?: Types.ObjectId;
   type: MovementType;
   quantity: number;
   referenceType?: 'work-order';
@@ -14,7 +14,7 @@ export interface IStockMovement extends Document {
 
 const stockMovementSchema = new Schema<IStockMovement>(
   {
-    componentId: { type: Schema.Types.ObjectId, ref: 'Component', required: true, index: true },
+    componentId: { type: Schema.Types.ObjectId, ref: 'Component', index: true },
     type: { type: String, required: true, enum: ['ingreso', 'egreso'] },
     quantity: { type: Number, required: true, min: 1 },
     referenceType: { type: String, enum: ['work-order'] },

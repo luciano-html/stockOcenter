@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import api from '@/services/api'
 import type { Componente, StockMovement, Pagination } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -10,17 +11,19 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search } from 'lucide-react'
+import { Search, Eye } from 'lucide-react'
+import { GoBack } from '@/components/shared/GoBack'
 
 export default function IngresoStock() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const [ingresoComp, setIngresoComp] = useState('')
-  const [ingresoCant, setIngresoCant] = useState(1)
+  const [ingresoCant, setIngresoCant] = useState('1')
   const [ingresoNotas, setIngresoNotas] = useState('')
 
   const [egresoComp, setEgresoComp] = useState('')
-  const [egresoCant, setEgresoCant] = useState(1)
+  const [egresoCant, setEgresoCant] = useState('1')
   const [egresoNotas, setEgresoNotas] = useState('')
 
   const [movParams, setMovParams] = useState({ componenteId: '', tipo: '', page: 1 })
@@ -51,27 +54,28 @@ export default function IngresoStock() {
     queryClient.invalidateQueries({ queryKey: ['movimientos'] })
     queryClient.invalidateQueries({ queryKey: ['movimientos-stock'] })
     queryClient.invalidateQueries({ queryKey: ['movimientos-recent'] })
+    queryClient.invalidateQueries({ queryKey: ['movimientos-recent-dash'] })
   }
 
   const ingresoMutation = useMutation({
-    mutationFn: () => api.post('/stock/ingreso', { componenteId: ingresoComp, cantidad: ingresoCant, notas: ingresoNotas || undefined }),
+    mutationFn: () => api.post('/stock/ingreso', { componenteId: ingresoComp, cantidad: Number(ingresoCant), notas: ingresoNotas || undefined }),
     onSuccess: () => {
       invalidateAll()
       setSuccessMsg('✓ Stock cargado correctamente')
       setIngresoComp('')
-      setIngresoCant(1)
+      setIngresoCant('1')
       setIngresoNotas('')
       setTimeout(() => setSuccessMsg(''), 3000)
     },
   })
 
   const egresoMutation = useMutation({
-    mutationFn: () => api.post('/stock/egreso', { componenteId: egresoComp, cantidad: egresoCant, notas: egresoNotas || undefined }),
+    mutationFn: () => api.post('/stock/egreso', { componenteId: egresoComp, cantidad: Number(egresoCant), notas: egresoNotas || undefined }),
     onSuccess: () => {
       invalidateAll()
       setSuccessMsg('✓ Egreso registrado correctamente')
       setEgresoComp('')
-      setEgresoCant(1)
+      setEgresoCant('1')
       setEgresoNotas('')
       setTimeout(() => setSuccessMsg(''), 3000)
     },
@@ -81,7 +85,9 @@ export default function IngresoStock() {
   const selectedEgreso = compData?.data.find((c) => c._id === egresoComp)
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-4">
+      <GoBack />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-6">
         <Card>
           <CardHeader><CardTitle>Ingreso de stock</CardTitle></CardHeader>
@@ -109,7 +115,7 @@ export default function IngresoStock() {
 
               <div className="space-y-2">
                 <Label>Cantidad recibida</Label>
-                <Input type="number" min={1} value={ingresoCant} onChange={(e) => setIngresoCant(Number(e.target.value))} />
+                <Input type="text" inputMode="numeric" value={ingresoCant} onChange={(e) => setIngresoCant(e.target.value.replace(/\D/g, ''))} />
               </div>
 
               <div className="space-y-2">
@@ -117,7 +123,7 @@ export default function IngresoStock() {
                 <Input placeholder="ej. Nro de remito, proveedor..." value={ingresoNotas} onChange={(e) => setIngresoNotas(e.target.value)} />
               </div>
 
-              <Button className="w-full" disabled={!ingresoComp || ingresoCant < 1 || ingresoMutation.isPending} onClick={() => ingresoMutation.mutate()}>
+              <Button className="w-full" disabled={!ingresoComp || !ingresoCant || Number(ingresoCant) < 1 || ingresoMutation.isPending} onClick={() => ingresoMutation.mutate()}>
                 {ingresoMutation.isPending ? 'Cargando...' : 'Cargar stock'}
               </Button>
             </div>
@@ -150,7 +156,7 @@ export default function IngresoStock() {
 
               <div className="space-y-2">
                 <Label>Cantidad a retirar</Label>
-                <Input type="number" min={1} value={egresoCant} onChange={(e) => setEgresoCant(Number(e.target.value))} />
+                <Input type="text" inputMode="numeric" value={egresoCant} onChange={(e) => setEgresoCant(e.target.value.replace(/\D/g, ''))} />
               </div>
 
               <div className="space-y-2">
@@ -182,10 +188,11 @@ export default function IngresoStock() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Tipo</TableHead>
-                      <TableHead>Componente</TableHead>
+                      <TableHead>Elemento</TableHead>
                       <TableHead>Cant.</TableHead>
                       <TableHead>Notas</TableHead>
                       <TableHead className="whitespace-nowrap">Fecha</TableHead>
+                      <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -196,7 +203,12 @@ export default function IngresoStock() {
                             {m.type === 'ingreso' ? 'ING' : 'EGR'}
                           </span>
                         </TableCell>
-                        <TableCell>{m.componentId.name}</TableCell>
+                        <TableCell>
+                          {m.referenceType === 'work-order'
+                            ? <span className="font-medium">Silla {m.referenceId?.chairTypeId?.name ?? ''}</span>
+                            : m.componentId?.name ?? '—'
+                          }
+                        </TableCell>
                         <TableCell className={m.type === 'ingreso' ? 'text-green-600' : 'text-destructive'}>
                           {m.type === 'ingreso' ? '+' : '-'}{m.quantity}
                         </TableCell>
@@ -206,6 +218,13 @@ export default function IngresoStock() {
                             day: '2-digit', month: '2-digit', year: 'numeric',
                             hour: '2-digit', minute: '2-digit',
                           })}
+                        </TableCell>
+                        <TableCell>
+                          {m.referenceType === 'work-order' && m.referenceId && (
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id}`)}>
+                              <Eye size={16} />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -246,10 +265,11 @@ export default function IngresoStock() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fecha</TableHead>
-                      <TableHead>Componente</TableHead>
+                      <TableHead>Elemento</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Cant.</TableHead>
                       <TableHead>Notas</TableHead>
+                      <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -261,7 +281,12 @@ export default function IngresoStock() {
                             hour: '2-digit', minute: '2-digit',
                           })}
                         </TableCell>
-                        <TableCell className="font-medium">{m.componentId?.name ?? '—'}</TableCell>
+                        <TableCell className="font-medium">
+                          {m.referenceType === 'work-order'
+                            ? <span>Silla {m.referenceId?.chairTypeId?.name ?? ''}</span>
+                            : m.componentId?.name ?? '—'
+                          }
+                        </TableCell>
                         <TableCell>
                           <Badge variant={m.type === 'ingreso' ? 'secondary' : 'destructive'}>
                             {m.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
@@ -271,10 +296,17 @@ export default function IngresoStock() {
                           {m.type === 'ingreso' ? '+' : '-'}{m.quantity}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{m.notes ?? '—'}</TableCell>
+                        <TableCell>
+                          {m.referenceType === 'work-order' && m.referenceId && (
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id}`)}>
+                              <Eye size={16} />
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {movData?.data.length === 0 && (
-                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -299,6 +331,7 @@ export default function IngresoStock() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   )
 }
