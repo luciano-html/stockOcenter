@@ -20,7 +20,7 @@ export default function ComponentesList() {
   const tipoFiltro = params.get('tipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [showReserved, setShowReserved] = useState(true)
+  const [showReserved, setShowReserved] = useState(false)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
@@ -50,42 +50,6 @@ export default function ComponentesList() {
 
   return (
     <div className="space-y-4">
-      {enReserva.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between py-3">
-            <CardTitle className="text-sm">Componentes en reserva ({enReserva.length})</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setShowReserved(!showReserved)}>
-              {showReserved ? <EyeOff size={16} /> : <Eye size={16} />}
-              {showReserved ? 'Ocultar' : 'Mostrar'}
-            </Button>
-          </CardHeader>
-          {showReserved && (
-            <CardContent className="pb-3">
-              <div className="max-h-[200px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Componente</TableHead>
-                      <TableHead>Reservado</TableHead>
-                      <TableHead>Disponible</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {enReserva.map((c) => (
-                      <TableRow key={c._id}>
-                        <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell className="text-amber-600 font-bold">{c.stockReservado} {c.unit}</TableCell>
-                        <TableCell>{c.stockDisponible} {c.unit}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      )}
-
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
@@ -113,6 +77,11 @@ export default function ComponentesList() {
             {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
         </div>
+        {enReserva.length > 0 && (
+          <Button variant="outline" onClick={() => setShowReserved(true)}>
+            <Eye size={16} /> En reserva ({enReserva.length})
+          </Button>
+        )}
         {isAdmin && (
           <Link to="/componentes/nuevo">
             <Button><Plus size={16} /> Nuevo componente</Button>
@@ -182,6 +151,30 @@ export default function ComponentesList() {
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
           <Button variant="destructive" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</Button>
+        </div>
+      </Dialog>
+
+      <Dialog open={showReserved} onOpenChange={setShowReserved}>
+        <DialogHeader><DialogTitle>Componentes en reserva ({enReserva.length})</DialogTitle></DialogHeader>
+        <div className="max-h-[300px] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Componente</TableHead>
+                <TableHead>Reservado</TableHead>
+                <TableHead>Disponible</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {enReserva.map((c) => (
+                <TableRow key={c._id}>
+                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="text-amber-600 font-bold">{c.stockReservado} {c.unit}</TableCell>
+                  <TableCell>{c.stockDisponible} {c.unit}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       </Dialog>
     </div>

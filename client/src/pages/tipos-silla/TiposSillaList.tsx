@@ -54,7 +54,7 @@ export default function TiposSillaList() {
               <TableRow key={t._id}>
                 <TableCell className="font-medium">{t.name}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {t.bom?.length ?? 0} componentes
+                  {t.bomCount ?? 0} componentes
                 </TableCell>
                 <TableCell>{t.active ? 'Sí' : 'No'}</TableCell>
                 {isAdmin && (

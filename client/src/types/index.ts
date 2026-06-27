@@ -35,6 +35,7 @@ export interface BOMItem {
 
 export interface ChairTypeWithBOM extends ChairType {
   bom: BOMItem[]
+  bomCount?: number
 }
 
 export interface WorkOrder {

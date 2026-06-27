@@ -4,7 +4,18 @@ import { ApiError } from '../utils/ApiError';
 
 export async function list(_req: Request, res: Response) {
   const tipos = await ChairType.find().sort({ name: 1 });
-  res.json({ data: tipos });
+
+  const counts = await BOMItem.aggregate([
+    { $group: { _id: '$chairTypeId', count: { $sum: 1 } } },
+  ]);
+  const countMap = new Map(counts.map((c) => [c._id.toString(), c.count]));
+
+  const data = tipos.map((t) => ({
+    ...t.toJSON(),
+    bomCount: countMap.get(t._id.toString()) ?? 0,
+  }));
+
+  res.json({ data });
 }
 
 export async function getById(req: Request, res: Response) {
