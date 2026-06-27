@@ -4,19 +4,51 @@ Este proyecto es una app web para gestionar stock de componentes de sillas (Node
 - Backend: Node + Express + TypeScript + Mongoose + Zod
 - Frontend: React + Vite + shadcn/ui + TanStack Query + react-hook-form + Zod
 - BD: MongoDB
-- Skill disponible: `node-express-mongo-react` (`.opencode/skills/node-express-mongo-react/SKILL.md`)
+- Skill: `node-express-mongo-react` (`.opencode/skills/node-express-mongo-react/SKILL.md`)
+- Paleta oficial: `docs/sdd/09-paleta-oficial-colores.md`
 
-## 📋 Regla principal: leer STATUS.md
-Al iniciar cada sesión, LEER `STATUS.md` completo. Ahí está el roadmap de punta a punta con checkboxes, fases completadas y el próximo paso a ejecutar.
+## 📋 Persistencia entre sesiones — leer en cada inicio
+1. Leer `STATUS.md` entero (estado + changelog + contexto de sesión)
+2. Leer `docs/sdd/09-paleta-oficial-colores.md` (colores y fuente)
+3. Si hay cambios en progreso, continuar desde la última entrada del changelog
 
-## Estado actual del proyecto (resumen)
-El proyecto está COMPLETO. Backend (6 fases) y Frontend (6 fases) terminados.
+## Estado actual
+El proyecto base (12 fases) está COMPLETO. Se están haciendo mejoras post-desarrollo.
 
 Probar local:
-  1. `cd server && npm run seed && npm run dev`
-  2. `cd client && npm run dev`
+```
+cd server && npm run dev
+cd client && npm run dev
+```
+Admin: `admin / admin123` — Solo existe Link con 9 componentes (Rolic, alerta=10).
 
-## Convenciones
-- Cada fase completa → commit con mensaje "fase N: descripción"
-- Todas las decisiones de arquitectura están documentadas en `docs/sdd/`
-- El archivo `prompt.txt` contiene el prompt original con los requerimientos del negocio
+Seed eliminado. La app persiste datos en MongoDB.
+
+## 📝 Commit policy
+Los commits se hacen automáticamente cuando la IA considera que hay un cambio significativo (feature completa, fix importante, refactor). Sin intervención del usuario.
+
+## 📝 Documentar en STATUS.md
+Todo cambio relevante se documenta en la sección **Changelog** de `STATUS.md` con formato:
+```markdown
+### YYYY-MM-DD: título corto
+- [tipo]: descripción
+```
+
+Además, la sección **Última sesión** de `STATUS.md` se actualiza cada vez que se termina una sesión con cambios.
+
+## Rutas clave del frontend
+| Ruta | Página |
+|---|---|
+| `/` | Dashboard |
+| `/ingreso-stock` | Ingreso/egreso + historial |
+| `/componentes` | Lista de componentes |
+| `/componentes/nuevo` | Crear componente |
+| `/componentes/:id` | Editar componente |
+| `/tipos-silla` | Tipos de silla |
+| `/tipos-silla/nuevo` | Nuevo tipo |
+| `/tipos-silla/:id` | Editar tipo + BOM |
+| `/ordenes-trabajo` | Órdenes de trabajo |
+| `/ordenes-trabajo/nuevo` | Nueva OT |
+| `/ordenes-trabajo/:id` | Detalle OT |
+| `/usuarios` | Admin: gestión de usuarios |
+| `/perfil` | Mi perfil |
