@@ -3,7 +3,7 @@ import { Component } from '../models';
 import { ApiError } from '../utils/ApiError';
 
 export async function list(_req: Request, res: Response) {
-  const { search, stockBajo } = _req.query as { search?: string; stockBajo?: string };
+  const { search, stockBajo, tipo, marca } = _req.query as Record<string, string | undefined>;
 
   const filter: Record<string, unknown> = {};
   if (search) {
@@ -12,6 +12,8 @@ export async function list(_req: Request, res: Response) {
   if (stockBajo === 'true') {
     filter.$expr = { $lte: ['$stockActual', '$stockMinimo'] };
   }
+  if (tipo) filter.tipo = tipo;
+  if (marca) filter.marca = marca;
 
   const componentes = await Component.find(filter).sort({ name: 1 });
   res.json({ data: componentes });
@@ -50,4 +52,12 @@ export async function remove(req: Request, res: Response) {
   const componente = await Component.findByIdAndDelete(req.params.id);
   if (!componente) throw ApiError.notFound('Componente no encontrado');
   res.json({ data: componente });
+}
+
+export async function filtros(_req: Request, res: Response) {
+  const [tipos, marcas] = await Promise.all([
+    Component.distinct('tipo', { tipo: { $ne: null } }),
+    Component.distinct('marca', { marca: { $ne: null } }),
+  ]);
+  res.json({ data: { tipos: tipos.sort(), marcas: marcas.sort() } });
 }

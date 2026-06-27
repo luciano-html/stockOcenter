@@ -2,6 +2,8 @@ export interface Componente {
   _id: string
   name: string
   description?: string
+  tipo: string
+  marca: string
   unit: string
   stockActual: number
   stockReservado: number
@@ -10,6 +12,11 @@ export interface Componente {
   stockBajo: boolean
   createdAt: string
   updatedAt: string
+}
+
+export interface ComponenteFiltros {
+  tipos: string[]
+  marcas: string[]
 }
 
 export interface ChairType {

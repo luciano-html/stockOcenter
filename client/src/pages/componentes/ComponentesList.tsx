@@ -2,11 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { Componente } from '@/types'
+import type { Componente, ComponenteFiltros } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
@@ -14,14 +15,27 @@ import { useState } from 'react'
 
 export default function ComponentesList() {
   const [search, setSearch] = useState('')
+  const [tipoFiltro, setTipoFiltro] = useState('')
+  const [marcaFiltro, setMarcaFiltro] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: Componente[] }>({
-    queryKey: ['componentes', search],
-    queryFn: () => api.get('/componentes', { params: { search: search || undefined } }).then((r) => r.data),
+    queryKey: ['componentes', search, tipoFiltro, marcaFiltro],
+    queryFn: () => api.get('/componentes', {
+      params: {
+        search: search || undefined,
+        tipo: tipoFiltro || undefined,
+        marca: marcaFiltro || undefined,
+      },
+    }).then((r) => r.data),
+  })
+
+  const { data: filtrosData } = useQuery<{ data: ComponenteFiltros }>({
+    queryKey: ['componentes-filtros'],
+    queryFn: () => api.get('/componentes/filtros').then((r) => r.data),
   })
 
   const deleteMutation = useMutation({
@@ -32,9 +46,19 @@ export default function ComponentesList() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <Input placeholder="Buscar componente..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Select value={tipoFiltro} onChange={(e) => setTipoFiltro(e.target.value)} className="w-40">
+            <option value="">Todos los tipos</option>
+            {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
+          </Select>
+          <Select value={marcaFiltro} onChange={(e) => setMarcaFiltro(e.target.value)} className="w-40">
+            <option value="">Todas las marcas</option>
+            {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
+          </Select>
         </div>
         {isAdmin && (
           <Link to="/componentes/nuevo">
@@ -49,9 +73,9 @@ export default function ComponentesList() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Marca</TableHead>
                 <TableHead>Unidad</TableHead>
-                <TableHead>Stock actual</TableHead>
-                <TableHead>Reservado</TableHead>
                 <TableHead>Disponible</TableHead>
                 <TableHead>Mínimo</TableHead>
                 <TableHead>Estado</TableHead>
@@ -62,9 +86,9 @@ export default function ComponentesList() {
               {data?.data.map((c) => (
                 <TableRow key={c._id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.marca}</TableCell>
                   <TableCell>{c.unit}</TableCell>
-                  <TableCell>{c.stockActual}</TableCell>
-                  <TableCell>{c.stockReservado}</TableCell>
                   <TableCell className="font-bold">{c.stockDisponible}</TableCell>
                   <TableCell>{c.stockMinimo}</TableCell>
                   <TableCell>

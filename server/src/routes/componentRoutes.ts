@@ -13,6 +13,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/filtros', componentController.filtros);
 router.get(
   '/',
   validate(listComponentsQuerySchema, 'query'),

@@ -111,13 +111,22 @@
 | 05 | Autenticación y roles | `docs/sdd/05-autenticacion-roles.md` |
 | 06 | UI Library (shadcn/ui) | `docs/sdd/06-ui-library.md` |
 | 07 | Fases de desarrollo | `docs/sdd/07-fases-desarrollo.md` |
+| 08 | Post-desarrollo: tipos y marcas en componentes | `docs/sdd/08-post-desarrollo-tipos-marcas.md` |
 
 ---
+
+## Mejora post-desarrollo: tipos y marcas
+
+- [x] Tipo y marca como campos obligatorios en Componente
+- [x] Endpoint `GET /api/componentes/filtros` con tipos/marcas existentes
+- [x] Filtros por tipo y marca en listado de componentes
+- [x] Autocomplete con `<datalist>` en formulario (sugiere valores existentes, permite nuevos)
+- [x] Seed con datos reales del usuario (46 componentes generales, 10 tipos de silla con BOM)
 
 ## Próximo paso
 
 ```
-Todo completo. Probar local:
-  1. server: npm run seed + npm run dev
-  2. client: npm run dev
+Probar local:
+  1. cd server && npm run seed && npm run dev
+  2. cd client && npm run dev
 ```
