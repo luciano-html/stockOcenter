@@ -6,6 +6,12 @@ export const ingresoStockSchema = z.object({
   notas: z.string().trim().optional(),
 });
 
+export const egresoStockSchema = z.object({
+  componenteId: z.string().length(24, 'ID de componente inválido'),
+  cantidad: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
+  notas: z.string().trim().optional(),
+});
+
 export const movimientosQuerySchema = z.object({
   componenteId: z.string().length(24).optional(),
   tipo: z.enum(['ingreso', 'egreso']).optional(),

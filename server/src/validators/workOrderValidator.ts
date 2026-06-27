@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createWorkOrderSchema = z.object({
   chairTypeId: z.string().length(24, 'ID de tipo de silla inválido'),
-  quantity: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
+  quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
 });
 
 export const workOrderParamsSchema = z.object({

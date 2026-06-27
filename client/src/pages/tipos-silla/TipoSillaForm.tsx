@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -49,11 +49,11 @@ export default function TipoSillaForm() {
     values: isEdit && tipoData ? { name: tipoData.data.name, description: tipoData.data.description ?? '' } : undefined,
   })
 
-  useState(() => {
+  useEffect(() => {
     if (isEdit && tipoData?.data.bom) {
       setBom(tipoData.data.bom.map((b) => ({ componentId: b.componentId._id, quantity: b.quantity })))
     }
-  })
+  }, [isEdit, tipoData])
 
   function addBOM() {
     if (!selectedComponent || bom.find((b) => b.componentId === selectedComponent)) return

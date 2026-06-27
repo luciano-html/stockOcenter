@@ -20,9 +20,9 @@ const data = {
       "apoyabrazos Negros": 0, "apoyabrazos Blancos": 0, "Apoyabrazos Gris": 0
     },
     "Link": {
-      "Respaldo": 0, "apoyabrazos": 0, "Asiento interior": 0, "Asiento exterior": 0,
-      "chapon / basculante": 0, "Cilindro": 0, "Estrella": 0, "Ruedas": 0,
-      "Fuelles": 0, "Leva neumatico": 0, "Visitor Negra": 0, "Visitor blanca": 0
+      "Respaldo": null, "apoyabrazos": null, "Asiento interior": null, "Asiento exterior": null,
+      "chapon / basculante": null, "Cilindro": null, "Estrella": null, "Ruedas": null,
+      "Fuelles": null
     },
     "Cool": {
       "Tortuguita": 0, "Asiento exterior": 0, "Asiento Madera": 0, "Marco Red": 0,
@@ -174,7 +174,8 @@ async function seed() {
     for (const [compName, qty] of Object.entries(bom)) {
       let compId = compMap.get(compName);
       if (!compId) {
-        const tipo = inferirTipo(compName);
+        let tipo = inferirTipo(compName);
+        if (compName === 'chapon / basculante') tipo = 'Basculante';
         const comp = await Component.create({ name: compName, tipo, ...(marca ? { marca } : {}), unit: 'unidad', stockActual: 0, stockMinimo: 1 });
         compId = comp._id.toString();
         compMap.set(compName, compId);

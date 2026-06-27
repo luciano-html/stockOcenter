@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
 import type { Componente, ComponenteFiltros } from '@/types'
@@ -8,16 +8,19 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 
 export default function ComponentesList() {
-  const [search, setSearch] = useState('')
-  const [tipoFiltro, setTipoFiltro] = useState('')
-  const [marcaFiltro, setMarcaFiltro] = useState('')
+  const [params, setParams] = useSearchParams()
+  const search = params.get('q') ?? ''
+  const tipoFiltro = params.get('tipo') ?? ''
+  const marcaFiltro = params.get('marca') ?? ''
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [showReserved, setShowReserved] = useState(true)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
@@ -43,19 +46,69 @@ export default function ComponentesList() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['componentes'] }); setDeleteId(null) },
   })
 
+  const enReserva = data?.data.filter((c) => c.stockReservado > 0) ?? []
+
   return (
     <div className="space-y-4">
+      {enReserva.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between py-3">
+            <CardTitle className="text-sm">Componentes en reserva ({enReserva.length})</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setShowReserved(!showReserved)}>
+              {showReserved ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showReserved ? 'Ocultar' : 'Mostrar'}
+            </Button>
+          </CardHeader>
+          {showReserved && (
+            <CardContent className="pb-3">
+              <div className="max-h-[200px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Componente</TableHead>
+                      <TableHead>Reservado</TableHead>
+                      <TableHead>Disponible</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {enReserva.map((c) => (
+                      <TableRow key={c._id}>
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell className="text-amber-600 font-bold">{c.stockReservado} {c.unit}</TableCell>
+                        <TableCell>{c.stockDisponible} {c.unit}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-          <Input placeholder="Buscar componente..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Buscar componente..." className="pl-9" value={search} onChange={(e) => {
+            const next = new URLSearchParams(params)
+            e.target.value ? next.set('q', e.target.value) : next.delete('q')
+            setParams(next, { replace: true })
+          }} />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <Select value={tipoFiltro} onChange={(e) => setTipoFiltro(e.target.value)} className="w-40">
+          <Select value={tipoFiltro} onChange={(e) => {
+            const next = new URLSearchParams(params)
+            e.target.value ? next.set('tipo', e.target.value) : next.delete('tipo')
+            setParams(next, { replace: true })
+          }} className="w-40">
             <option value="">Todos los tipos</option>
             {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
           </Select>
-          <Select value={marcaFiltro} onChange={(e) => setMarcaFiltro(e.target.value)} className="w-40">
+          <Select value={marcaFiltro} onChange={(e) => { 
+            const next = new URLSearchParams(params)
+            e.target.value ? next.set('marca', e.target.value) : next.delete('marca')
+            setParams(next, { replace: true })
+          }} className="w-40">
             <option value="">Todas las marcas</option>
             {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
@@ -76,6 +129,8 @@ export default function ComponentesList() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Marca</TableHead>
                 <TableHead>Unidad</TableHead>
+                <TableHead>Actual</TableHead>
+                <TableHead>Reservado</TableHead>
                 <TableHead>Disponible</TableHead>
                 <TableHead>Mínimo</TableHead>
                 <TableHead>Estado</TableHead>
@@ -89,6 +144,8 @@ export default function ComponentesList() {
                   <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
                   <TableCell className="text-sm text-muted-foreground">{c.marca || '—'}</TableCell>
                   <TableCell>{c.unit}</TableCell>
+                  <TableCell>{c.stockActual}</TableCell>
+                  <TableCell className={c.stockReservado > 0 ? 'text-amber-600 font-bold' : ''}>{c.stockReservado}</TableCell>
                   <TableCell className="font-bold">{c.stockDisponible}</TableCell>
                   <TableCell>{c.stockMinimo}</TableCell>
                   <TableCell>
@@ -112,7 +169,7 @@ export default function ComponentesList() {
                 </TableRow>
               ))}
               {data?.data.length === 0 && (
-                <TableRow><TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-muted-foreground py-8">Sin componentes</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 10 : 9} className="text-center text-muted-foreground py-8">Sin componentes</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

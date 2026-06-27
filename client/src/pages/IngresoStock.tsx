@@ -1,108 +1,304 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/services/api'
-import type { Componente } from '@/types'
+import type { Componente, StockMovement, Pagination } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Search } from 'lucide-react'
 
 export default function IngresoStock() {
-  const [componenteId, setComponenteId] = useState('')
-  const [cantidad, setCantidad] = useState(1)
-  const [notas, setNotas] = useState('')
-  const [success, setSuccess] = useState(false)
   const queryClient = useQueryClient()
+
+  const [ingresoComp, setIngresoComp] = useState('')
+  const [ingresoCant, setIngresoCant] = useState(1)
+  const [ingresoNotas, setIngresoNotas] = useState('')
+
+  const [egresoComp, setEgresoComp] = useState('')
+  const [egresoCant, setEgresoCant] = useState(1)
+  const [egresoNotas, setEgresoNotas] = useState('')
+
+  const [movParams, setMovParams] = useState({ componenteId: '', tipo: '', page: 1 })
+  const [movFilters, setMovFilters] = useState(movParams)
+
+  const [successMsg, setSuccessMsg] = useState('')
 
   const { data: compData } = useQuery<{ data: Componente[] }>({
     queryKey: ['componentes-ingreso'],
     queryFn: () => api.get('/componentes', { params: { limit: 200 } }).then((r) => r.data),
   })
 
-  const mutation = useMutation({
-    mutationFn: () => api.post('/stock/ingreso', { componenteId, cantidad, notas: notas || undefined }),
+  const { data: recentData } = useQuery<{ data: StockMovement[] }>({
+    queryKey: ['movimientos-recent'],
+    queryFn: () => api.get('/stock/movimientos', { params: { limit: 15 } }).then((r) => r.data),
+    refetchInterval: 10000,
+  })
+
+  const { data: movData, isLoading: movLoading } = useQuery<{ data: StockMovement[]; pagination: Pagination }>({
+    queryKey: ['movimientos-stock', movFilters],
+    queryFn: () => api.get('/stock/movimientos', { params: movFilters }).then((r) => r.data),
+  })
+
+  function invalidateAll() {
+    queryClient.invalidateQueries({ queryKey: ['componentes'] })
+    queryClient.invalidateQueries({ queryKey: ['componentes-ingreso'] })
+    queryClient.invalidateQueries({ queryKey: ['stock-resumen'] })
+    queryClient.invalidateQueries({ queryKey: ['movimientos'] })
+    queryClient.invalidateQueries({ queryKey: ['movimientos-stock'] })
+    queryClient.invalidateQueries({ queryKey: ['movimientos-recent'] })
+  }
+
+  const ingresoMutation = useMutation({
+    mutationFn: () => api.post('/stock/ingreso', { componenteId: ingresoComp, cantidad: ingresoCant, notas: ingresoNotas || undefined }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['componentes'] })
-      queryClient.invalidateQueries({ queryKey: ['stock-resumen'] })
-      queryClient.invalidateQueries({ queryKey: ['movimientos'] })
-      setSuccess(true)
-      setComponenteId('')
-      setCantidad(1)
-      setNotas('')
-      setTimeout(() => setSuccess(false), 3000)
+      invalidateAll()
+      setSuccessMsg('✓ Stock cargado correctamente')
+      setIngresoComp('')
+      setIngresoCant(1)
+      setIngresoNotas('')
+      setTimeout(() => setSuccessMsg(''), 3000)
     },
   })
 
-  const selected = compData?.data.find((c) => c._id === componenteId)
+  const egresoMutation = useMutation({
+    mutationFn: () => api.post('/stock/egreso', { componenteId: egresoComp, cantidad: egresoCant, notas: egresoNotas || undefined }),
+    onSuccess: () => {
+      invalidateAll()
+      setSuccessMsg('✓ Egreso registrado correctamente')
+      setEgresoComp('')
+      setEgresoCant(1)
+      setEgresoNotas('')
+      setTimeout(() => setSuccessMsg(''), 3000)
+    },
+  })
+
+  const selectedIngreso = compData?.data.find((c) => c._id === ingresoComp)
+  const selectedEgreso = compData?.data.find((c) => c._id === egresoComp)
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
-      <Card>
-        <CardHeader><CardTitle>Cargar stock recibido</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="componente">Componente</Label>
-              <Select
-                id="componente"
-                value={componenteId}
-                onChange={(e) => setComponenteId(e.target.value)}
-              >
-                <option value="">Seleccionar componente...</option>
-                {compData?.data.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} ({c.tipo}{c.marca ? ` - ${c.marca}` : ''}) — disp. {c.stockDisponible} {c.unit}
-                  </option>
-                ))}
-              </Select>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
+        <Card>
+          <CardHeader><CardTitle>Ingreso de stock</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Componente</Label>
+                <Select value={ingresoComp} onChange={(e) => setIngresoComp(e.target.value)}>
+                  <option value="">Seleccionar componente...</option>
+                  {compData?.data.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name} ({c.tipo}{c.marca ? ` - ${c.marca}` : ''}) — disp. {c.stockDisponible} {c.unit}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              {selectedIngreso && (
+                <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
+                  <p>Stock actual: <strong>{selectedIngreso.stockActual}</strong> {selectedIngreso.unit}</p>
+                  <p>Reservado: <strong>{selectedIngreso.stockReservado}</strong> {selectedIngreso.unit}</p>
+                  <p>Disponible: <strong>{selectedIngreso.stockDisponible}</strong> {selectedIngreso.unit}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Cantidad recibida</Label>
+                <Input type="number" min={1} value={ingresoCant} onChange={(e) => setIngresoCant(Number(e.target.value))} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notas (opcional)</Label>
+                <Input placeholder="ej. Nro de remito, proveedor..." value={ingresoNotas} onChange={(e) => setIngresoNotas(e.target.value)} />
+              </div>
+
+              <Button className="w-full" disabled={!ingresoComp || ingresoCant < 1 || ingresoMutation.isPending} onClick={() => ingresoMutation.mutate()}>
+                {ingresoMutation.isPending ? 'Cargando...' : 'Cargar stock'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Egreso de stock</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Componente</Label>
+                <Select value={egresoComp} onChange={(e) => setEgresoComp(e.target.value)}>
+                  <option value="">Seleccionar componente...</option>
+                  {compData?.data.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name} ({c.tipo}{c.marca ? ` - ${c.marca}` : ''}) — disp. {c.stockDisponible} {c.unit}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              {selectedEgreso && (
+                <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
+                  <p>Stock actual: <strong>{selectedEgreso.stockActual}</strong> {selectedEgreso.unit}</p>
+                  <p>Reservado: <strong>{selectedEgreso.stockReservado}</strong> {selectedEgreso.unit}</p>
+                  <p>Disponible: <strong>{selectedEgreso.stockDisponible}</strong> {selectedEgreso.unit}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Cantidad a retirar</Label>
+                <Input type="number" min={1} value={egresoCant} onChange={(e) => setEgresoCant(Number(e.target.value))} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Motivo (opcional)</Label>
+                <Input placeholder="ej. Devolución, ajuste, consumo..." value={egresoNotas} onChange={(e) => setEgresoNotas(e.target.value)} />
+              </div>
+
+              <Button className="w-full" variant="destructive" disabled={!egresoComp || egresoCant < 1 || egresoMutation.isPending} onClick={() => egresoMutation.mutate()}>
+                {egresoMutation.isPending ? 'Procesando...' : 'Retirar stock'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {successMsg && (
+          <p className="text-sm text-green-600 text-center font-medium">{successMsg}</p>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        <Card>
+          <CardHeader><CardTitle>Últimos movimientos</CardTitle></CardHeader>
+          <CardContent>
+            {!recentData?.data.length ? (
+              <p className="text-sm text-muted-foreground">Sin movimientos registrados</p>
+            ) : (
+              <div className="max-h-[300px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Componente</TableHead>
+                      <TableHead>Cant.</TableHead>
+                      <TableHead>Notas</TableHead>
+                      <TableHead className="whitespace-nowrap">Fecha</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentData.data.map((m) => (
+                      <TableRow key={m._id}>
+                        <TableCell>
+                          <span className={m.type === 'ingreso' ? 'text-green-600 font-medium' : 'text-destructive font-medium'}>
+                            {m.type === 'ingreso' ? 'ING' : 'EGR'}
+                          </span>
+                        </TableCell>
+                        <TableCell>{m.componentId.name}</TableCell>
+                        <TableCell className={m.type === 'ingreso' ? 'text-green-600' : 'text-destructive'}>
+                          {m.type === 'ingreso' ? '+' : '-'}{m.quantity}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[100px] truncate">{m.notes ?? '-'}</TableCell>
+                        <TableCell className="whitespace-nowrap text-xs">
+                          {new Date(m.createdAt).toLocaleString('es-AR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Todo el historial</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="w-full sm:w-48">
+                <Select value={movParams.componenteId} onChange={(e) => setMovParams({ ...movParams, componenteId: e.target.value })}>
+                  <option value="">Todos los componentes</option>
+                  {compData?.data.map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div className="w-full sm:w-36">
+                <Select value={movParams.tipo} onChange={(e) => setMovParams({ ...movParams, tipo: e.target.value })}>
+                  <option value="">Todos</option>
+                  <option value="ingreso">Ingreso</option>
+                  <option value="egreso">Egreso</option>
+                </Select>
+              </div>
+              <Button onClick={() => setMovFilters({ ...movParams, page: 1 })}><Search size={16} /> Buscar</Button>
             </div>
 
-            {selected && (
-              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
-                <p>Stock actual: <strong>{selected.stockActual}</strong> {selected.unit}</p>
-                <p>Reservado: <strong>{selected.stockReservado}</strong> {selected.unit}</p>
-                <p>Disponible: <strong>{selected.stockDisponible}</strong> {selected.unit}</p>
+            {movLoading ? (
+              <Skeleton className="h-64" />
+            ) : (
+              <div className="max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Componente</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Cant.</TableHead>
+                      <TableHead>Notas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movData?.data.map((m) => (
+                      <TableRow key={m._id}>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {new Date(m.createdAt).toLocaleString('es-AR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </TableCell>
+                        <TableCell className="font-medium">{m.componentId?.name ?? '—'}</TableCell>
+                        <TableCell>
+                          <Badge variant={m.type === 'ingreso' ? 'secondary' : 'destructive'}>
+                            {m.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className={m.type === 'ingreso' ? 'text-green-600 font-bold' : 'text-destructive font-bold'}>
+                          {m.type === 'ingreso' ? '+' : '-'}{m.quantity}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{m.notes ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {movData?.data.length === 0 && (
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin movimientos</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="cantidad">Cantidad recibida</Label>
-              <Input
-                id="cantidad"
-                type="number"
-                min={1}
-                value={cantidad}
-                onChange={(e) => setCantidad(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notas">Notas (opcional)</Label>
-              <Input
-                id="notas"
-                placeholder="ej. Nro de remito, proveedor..."
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-              />
-            </div>
-
-            <Button
-              className="w-full"
-              disabled={!componenteId || cantidad < 1 || mutation.isPending}
-              onClick={() => mutation.mutate()}
-            >
-              {mutation.isPending ? 'Cargando...' : 'Cargar stock'}
-            </Button>
-
-            {success && (
-              <p className="text-sm text-green-600 text-center font-medium">
-                ✓ Stock cargado correctamente
-              </p>
+            {movData?.pagination && movData.pagination.pages > 1 && (
+              <div className="flex justify-center gap-2 pt-2">
+                <Button variant="outline" size="sm" disabled={movFilters.page <= 1}
+                  onClick={() => setMovFilters({ ...movFilters, page: movFilters.page - 1 })}>
+                  Anterior
+                </Button>
+                <span className="flex items-center text-sm text-muted-foreground">
+                  Pág. {movFilters.page} de {movData.pagination.pages}
+                </span>
+                <Button variant="outline" size="sm" disabled={movFilters.page >= movData.pagination.pages}
+                  onClick={() => setMovFilters({ ...movFilters, page: movFilters.page + 1 })}>
+                  Siguiente
+                </Button>
+              </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

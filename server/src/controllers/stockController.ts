@@ -22,6 +22,31 @@ export async function ingreso(req: Request, res: Response) {
   res.json({ data: componente });
 }
 
+export async function egreso(req: Request, res: Response) {
+  const { componenteId, cantidad, notas } = req.body;
+
+  const componente = await Component.findById(componenteId);
+  if (!componente) throw ApiError.notFound('Componente no encontrado');
+
+  if (componente.stockActual - componente.stockReservado < cantidad) {
+    throw ApiError.badRequest(
+      `Stock insuficiente. Disponible: ${componente.stockActual - componente.stockReservado}, solicitado: ${cantidad}`
+    );
+  }
+
+  componente.stockActual -= cantidad;
+  await componente.save();
+
+  await StockMovement.create({
+    componentId: componenteId,
+    type: 'egreso',
+    quantity: cantidad,
+    notes: notas,
+  });
+
+  res.json({ data: componente });
+}
+
 export async function resumen(_req: Request, res: Response) {
   const componentes = await Component.find().sort({ name: 1 });
   const tiposSilla = await ChairType.find({ active: true });

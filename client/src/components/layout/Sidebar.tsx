@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  LayoutDashboard, Package, ArmchairIcon, ClipboardList, History, LogOut, X, Truck,
+  LayoutDashboard, Package, ArmchairIcon, ClipboardList, LogOut, X, Truck,
 } from 'lucide-react'
 
 const links = [
@@ -11,7 +11,6 @@ const links = [
   { to: '/componentes', label: 'Componentes', icon: Package },
   { to: '/tipos-silla', label: 'Tipos de silla', icon: ArmchairIcon },
   { to: '/ordenes-trabajo', label: 'Órdenes de trabajo', icon: ClipboardList },
-  { to: '/movimientos', label: 'Movimientos', icon: History },
 ]
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {

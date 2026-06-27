@@ -43,57 +43,66 @@ export default function Dashboard() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Componentes con stock bajo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Sillas posibles por tipo</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Componente</TableHead>
-                <TableHead>Disponible</TableHead>
-                <TableHead>Mínimo</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {resumen?.componentes.filter((c) => c.stockBajo).length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Sin alertas</TableCell></TableRow>
-              )}
-              {resumen?.componentes.filter((c) => c.stockBajo).map((c) => (
-                <TableRow key={c._id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell>{c.stockDisponible} {c.unit}</TableCell>
-                  <TableCell>{c.stockMinimo}</TableCell>
-                  <TableCell><Badge variant="destructive">Stock bajo</Badge></TableCell>
+          <div className="max-h-[320px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tipo de silla</TableHead>
+                  <TableHead>Sillas posibles</TableHead>
+                  <TableHead>Componente limitante</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {resumen?.sillasPosibles.map((s) => (
+                  <TableRow key={s._id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="text-lg font-bold">{s.sillasPosibles}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {s.limitante ? (
+                        <span className="flex flex-col">
+                          <span>{s.limitante.name}</span>
+                          <span className="text-xs">disp. {s.limitante.stockDisponible} / necesita {s.limitante.necesario} c/u</span>
+                        </span>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Sillas posibles por tipo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Componentes con stock bajo</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tipo de silla</TableHead>
-                <TableHead>Sillas posibles</TableHead>
-                <TableHead>Limitante</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {resumen?.sillasPosibles.map((s) => (
-                <TableRow key={s._id}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="text-lg font-bold">{s.sillasPosibles}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {s.limitante ? `${s.limitante.name} (disp. ${s.limitante.stockDisponible}, necesita ${s.limitante.necesario} c/u)` : '—'}
-                  </TableCell>
+          <div className="max-h-[320px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Componente</TableHead>
+                  <TableHead>Disponible</TableHead>
+                  <TableHead>Mínimo</TableHead>
+                  <TableHead>Estado</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {resumen?.componentes.filter((c) => c.stockBajo).length === 0 && (
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Sin alertas</TableCell></TableRow>
+                )}
+                {resumen?.componentes.filter((c) => c.stockBajo).map((c) => (
+                  <TableRow key={c._id}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell>{c.stockDisponible} {c.unit}</TableCell>
+                    <TableCell>{c.stockMinimo}</TableCell>
+                    <TableCell><Badge variant="destructive">Stock bajo</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

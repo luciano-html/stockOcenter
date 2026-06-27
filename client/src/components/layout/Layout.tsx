@@ -9,7 +9,6 @@ const titles: Record<string, string> = {
   '/componentes': 'Componentes',
   '/tipos-silla': 'Tipos de silla',
   '/ordenes-trabajo': 'Órdenes de trabajo',
-  '/movimientos': 'Movimientos',
 }
 
 export function Layout() {
