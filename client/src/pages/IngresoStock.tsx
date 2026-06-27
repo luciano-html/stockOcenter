@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Search, Eye } from 'lucide-react'
 import { GoBack } from '@/components/shared/GoBack'
 
@@ -30,6 +31,7 @@ export default function IngresoStock() {
   const [movFilters, setMovFilters] = useState(movParams)
 
   const [successMsg, setSuccessMsg] = useState('')
+  const [confirmAction, setConfirmAction] = useState<'ingreso' | 'egreso' | null>(null)
 
   const { data: compData } = useQuery<{ data: Componente[] }>({
     queryKey: ['componentes-ingreso'],
@@ -123,7 +125,7 @@ export default function IngresoStock() {
                 <Input placeholder="ej. Nro de remito, proveedor..." value={ingresoNotas} onChange={(e) => setIngresoNotas(e.target.value)} />
               </div>
 
-              <Button className="w-full" disabled={!ingresoComp || !ingresoCant || Number(ingresoCant) < 1 || ingresoMutation.isPending} onClick={() => ingresoMutation.mutate()}>
+              <Button className="w-full" disabled={!ingresoComp || !ingresoCant || Number(ingresoCant) < 1 || ingresoMutation.isPending} onClick={() => setConfirmAction('ingreso')}>
                 {ingresoMutation.isPending ? 'Cargando...' : 'Cargar stock'}
               </Button>
             </div>
@@ -164,7 +166,7 @@ export default function IngresoStock() {
                 <Input placeholder="ej. Devolución, ajuste, consumo..." value={egresoNotas} onChange={(e) => setEgresoNotas(e.target.value)} />
               </div>
 
-              <Button className="w-full" variant="destructive" disabled={!egresoComp || egresoCant < 1 || egresoMutation.isPending} onClick={() => egresoMutation.mutate()}>
+              <Button className="w-full" variant="destructive" disabled={!egresoComp || egresoCant < 1 || egresoMutation.isPending} onClick={() => setConfirmAction('egreso')}>
                 {egresoMutation.isPending ? 'Procesando...' : 'Retirar stock'}
               </Button>
             </div>
@@ -221,7 +223,7 @@ export default function IngresoStock() {
                         </TableCell>
                         <TableCell>
                           {m.referenceType === 'work-order' && m.referenceId && (
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id}`)}>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id ?? m.referenceId}`)}>
                               <Eye size={16} />
                             </Button>
                           )}
@@ -298,7 +300,7 @@ export default function IngresoStock() {
                         <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">{m.notes ?? '—'}</TableCell>
                         <TableCell>
                           {m.referenceType === 'work-order' && m.referenceId && (
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id}`)}>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id ?? m.referenceId}`)}>
                               <Eye size={16} />
                             </Button>
                           )}
@@ -332,6 +334,30 @@ export default function IngresoStock() {
         </Card>
       </div>
     </div>
+
+      <Dialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
+        <DialogHeader>
+          <DialogTitle>
+            {confirmAction === 'ingreso' ? '¿Cargar stock?' : '¿Retirar stock?'}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-4">
+          {confirmAction === 'ingreso'
+            ? `Se agregarán ${Number(ingresoCant)} unidades de ${selectedIngreso?.name ?? ''} al stock.`
+            : `Se retirarán ${Number(egresoCant)} unidades de ${selectedEgreso?.name ?? ''} del stock.`}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancelar</Button>
+          <Button
+            variant={confirmAction === 'egreso' ? 'destructive' : 'default'}
+            onClick={() => {
+              setConfirmAction(null)
+              if (confirmAction === 'ingreso') ingresoMutation.mutate()
+              else egresoMutation.mutate()
+            }}
+          >Confirmar</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

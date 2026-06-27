@@ -28,6 +28,7 @@ type FormData = z.infer<typeof schema>
 export default function UsuariosList() {
   const [open, setOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [confirmCreate, setConfirmCreate] = useState(false)
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery<{ data: User[] }>({
@@ -99,7 +100,7 @@ export default function UsuariosList() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogHeader><DialogTitle>Nuevo usuario</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit((form) => createMutation.mutate(form))} className="space-y-4 px-1">
+        <form onSubmit={handleSubmit(() => setConfirmCreate(true))} className="space-y-4 px-1">
           <div className="space-y-2">
             <Label>Usuario</Label>
             <Input {...register('username')} />
@@ -135,6 +136,15 @@ export default function UsuariosList() {
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
           <Button variant="destructive" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</Button>
+        </div>
+      </Dialog>
+
+      <Dialog open={confirmCreate} onOpenChange={setConfirmCreate}>
+        <DialogHeader><DialogTitle>¿Crear usuario?</DialogTitle></DialogHeader>
+        <p className="text-sm text-muted-foreground mb-4">Se creará un nuevo usuario con los datos ingresados.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setConfirmCreate(false)}>Cancelar</Button>
+          <Button onClick={() => { setConfirmCreate(false); handleSubmit((form) => createMutation.mutate(form))() }}>Confirmar</Button>
         </div>
       </Dialog>
     </div>

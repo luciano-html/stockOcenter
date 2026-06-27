@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
@@ -30,6 +31,7 @@ export default function TipoSillaForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [showConfirm, setShowConfirm] = useState(false)
   const [bom, setBom] = useState<BOMEntry[]>([])
   const [selectedComponent, setSelectedComponent] = useState('')
   const [selectedQty, setSelectedQty] = useState(1)
@@ -146,13 +148,26 @@ export default function TipoSillaForm() {
         </div>
 
         <div className="flex gap-2 justify-end">
-          <Button type="button" variant="outline" onClick={() => navigate('/tipos-silla')}>Cancelar</Button>
-          <Button onClick={handleSubmit((form) => mutation.mutate(form))} disabled={mutation.isPending}>
-            {mutation.isPending ? 'Guardando...' : 'Guardar'}
-          </Button>
+            <Button type="button" variant="outline" onClick={() => navigate('/tipos-silla')}>Cancelar</Button>
+            <Button type="button" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>
+             {mutation.isPending ? 'Guardando...' : 'Guardar'}
+            </Button>
         </div>
       </CardContent>
     </Card>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogHeader>
+          <DialogTitle>{isEdit ? '¿Guardar cambios?' : '¿Crear tipo de silla?'}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-4">
+          {isEdit ? 'Se actualizarán los datos del tipo de silla.' : 'Se creará un nuevo tipo de silla con su BOM.'}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
+          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

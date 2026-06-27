@@ -43,7 +43,7 @@ export interface ChairTypeWithBOM extends ChairType {
 
 export interface WorkOrder {
   _id: string
-  chairTypeId: { _id: string; name: string }
+  chairTypeId?: { _id: string; name: string }
   quantity: number
   status: 'pendiente' | 'en_progreso' | 'pausada' | 'finalizada' | 'cancelada'
   createdAt: string
@@ -62,7 +62,7 @@ export interface StockMovement {
   type: 'ingreso' | 'egreso'
   quantity: number
   referenceType?: 'work-order'
-  referenceId?: { _id: string; chairTypeId: { name: string }; quantity: number }
+  referenceId?: { _id: string; chairTypeId?: { name: string }; quantity: number }
   notes?: string
   createdAt: string
 }

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { GoBack } from '@/components/shared/GoBack'
 import { Plus, Trash2, Package, Wrench } from 'lucide-react'
@@ -18,6 +19,7 @@ type ItemRow = { componentId: string; componentName: string; quantity: string }
 export default function OrdenTrabajoForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [showConfirm, setShowConfirm] = useState(false)
   const [chairTypeId, setChairTypeId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [adicionales, setAdicionales] = useState<ItemRow[]>([])
@@ -39,7 +41,7 @@ export default function OrdenTrabajoForm() {
 
   const mutation = useMutation({
     mutationFn: () => api.post('/ordenes-trabajo', {
-      chairTypeId,
+      ...(chairTypeId ? { chairTypeId } : {}),
       quantity: Number(quantity),
       items: [
         ...adicionales.map((i) => ({ componentId: i.componentId, quantity: Number(i.quantity), type: 'adicional' as const })),
@@ -64,9 +66,9 @@ export default function OrdenTrabajoForm() {
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="chairTypeId">Tipo de silla</Label>
+            <Label htmlFor="chairTypeId">Tipo de silla <span className="text-xs text-muted-foreground">(opcional)</span></Label>
             <Select id="chairTypeId" value={chairTypeId} onChange={(e) => setChairTypeId(e.target.value)}>
-              <option value="">Seleccionar...</option>
+              <option value="">Solo repuestos</option>
               {tiposData?.data.filter((t) => t.active).map((t) => (
                 <option key={t._id} value={t._id}>{t.name}</option>
               ))}
@@ -79,6 +81,7 @@ export default function OrdenTrabajoForm() {
           </div>
         </div>
 
+        {chairTypeId && (
         <div className="border-t pt-4 space-y-3">
           <div className="flex items-center gap-2">
             <Package size={16} className="text-muted-foreground" />
@@ -137,6 +140,7 @@ export default function OrdenTrabajoForm() {
             </Button>
           </div>
         </div>
+        )}
 
         <div className="border-t pt-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -199,12 +203,29 @@ export default function OrdenTrabajoForm() {
 
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
-          <Button onClick={() => mutation.mutate()} disabled={!chairTypeId || mutation.isPending}>
+          <Button onClick={() => setShowConfirm(true)} disabled={(!chairTypeId && repuestos.length === 0) || mutation.isPending}>
             {mutation.isPending ? 'Creando...' : 'Crear orden'}
           </Button>
         </div>
       </CardContent>
     </Card>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogHeader>
+          <DialogTitle>¿Crear orden de trabajo?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-4">
+          {chairTypeId
+            ? `Se creará una orden por ${quantity} silla${(Number(quantity) !== 1 ? 's' : '')} ${tiposData?.data.find(t => t._id === chairTypeId)?.name}.`
+            : 'Se creará una orden solo con repuestos.'}
+          {adicionales.length > 0 && ` Incluye ${adicionales.length} adicional(es).`}
+          {repuestos.length > 0 && ` Incluye ${repuestos.length} repuesto(s).`}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
+          <Button onClick={() => { setShowConfirm(false); mutation.mutate() }}>Confirmar</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

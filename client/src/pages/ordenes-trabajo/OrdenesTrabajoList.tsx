@@ -68,7 +68,7 @@ export default function OrdenesTrabajoList() {
             {data?.data.map((ot) => (
               <TableRow key={ot._id}>
                 <TableCell className="text-xs font-mono text-muted-foreground">#{ot._id.slice(-6)}</TableCell>
-                <TableCell className="font-medium">{ot.chairTypeId.name}</TableCell>
+                <TableCell className="font-medium">{ot.chairTypeId?.name ?? 'Solo repuestos'}</TableCell>
                 <TableCell>{ot.quantity}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={statusClass[ot.status]}>

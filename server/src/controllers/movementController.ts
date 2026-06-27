@@ -1,11 +1,22 @@
 import { Request, Response } from 'express';
-import { StockMovement } from '../models';
+import mongoose from 'mongoose';
+import { StockMovement, BOMItem } from '../models';
 
 export async function list(req: Request, res: Response) {
   const { componenteId, tipo, desde, hasta, page, limit } = req.query as Record<string, string>;
 
   const filter: Record<string, unknown> = {};
-  if (componenteId) filter.componentId = componenteId;
+  if (componenteId) {
+    const bomItems = await BOMItem.find({ componentId: componenteId }).select('chairTypeId');
+    const chairTypeIds = [...new Set(bomItems.map((b) => b.chairTypeId.toString()))];
+    const workOrders = await mongoose.model('WorkOrder').find({ chairTypeId: { $in: chairTypeIds } }).select('_id');
+    const workOrderIds = workOrders.map((wo) => wo._id);
+
+    filter.$or = [
+      { componentId: componenteId },
+      { referenceType: 'work-order', referenceId: { $in: workOrderIds } },
+    ];
+  }
   if (tipo) filter.type = tipo;
   if (desde || hasta) {
     const dateFilter: Record<string, Date> = {};

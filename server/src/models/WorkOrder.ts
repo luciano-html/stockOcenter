@@ -9,7 +9,7 @@ export interface IWorkOrderItem {
 }
 
 export interface IWorkOrder extends Document {
-  chairTypeId: Types.ObjectId;
+  chairTypeId?: Types.ObjectId;
   quantity: number;
   status: WorkOrderStatus;
   items?: IWorkOrderItem[];
@@ -29,7 +29,7 @@ const workOrderItemSchema = new Schema<IWorkOrderItem>(
 
 const workOrderSchema = new Schema<IWorkOrder>(
   {
-    chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: true },
+    chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: false },
     quantity: { type: Number, required: true, min: 1 },
     items: { type: [workOrderItemSchema] },
     status: {

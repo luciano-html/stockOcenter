@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GoBack } from '@/components/shared/GoBack'
 import { useState } from 'react'
 
@@ -23,6 +24,7 @@ export default function PerfilForm() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
   const [success, setSuccess] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -46,7 +48,7 @@ export default function PerfilForm() {
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>Mi perfil</CardTitle></CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit((form) => mutation.mutate(form))} className="space-y-4">
+        <form onSubmit={handleSubmit(() => setShowConfirm(true))} className="space-y-4">
           <div className="space-y-2">
             <Label>Usuario</Label>
             <Input value={user?.username ?? ''} disabled />
@@ -75,6 +77,17 @@ export default function PerfilForm() {
         </form>
       </CardContent>
     </Card>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogHeader>
+          <DialogTitle>¿Guardar cambios?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-4">Se actualizarán los datos de tu perfil.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
+          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

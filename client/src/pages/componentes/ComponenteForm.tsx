@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GoBack } from '@/components/shared/GoBack'
 
 const schema = z.object({
@@ -29,6 +31,7 @@ export default function ComponenteForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const { data, isLoading } = useQuery<{ data: Componente }>({
     queryKey: ['componente', id],
@@ -121,11 +124,24 @@ export default function ComponenteForm() {
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => navigate('/componentes')}>Cancelar</Button>
-            <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Guardando...' : 'Guardar'}</Button>
+            <Button type="button" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>{mutation.isPending ? 'Guardando...' : 'Guardar'}</Button>
           </div>
         </form>
       </CardContent>
     </Card>
+
+      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <DialogHeader>
+          <DialogTitle>{isEdit ? '¿Guardar cambios?' : '¿Crear componente?'}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-4">
+          {isEdit ? 'Se actualizarán los datos del componente.' : 'Se creará un nuevo componente.'}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
+          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

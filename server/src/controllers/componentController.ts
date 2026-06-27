@@ -8,19 +8,39 @@ export async function reservas(_req: Request, res: Response) {
   const resultado: Record<string, { componente: { _id: string; name: string }; cantidadReservada: number; ordenes: { id: string; silla: string; cantidad: number }[] }> = {};
 
   for (const ot of ordenes) {
-    const bom = await BOMItem.find({ chairTypeId: ot.chairTypeId._id });
-    const sillaName = (ot.chairTypeId as unknown as { name: string }).name;
+    if (ot.chairTypeId) {
+      const bom = await BOMItem.find({ chairTypeId: ot.chairTypeId._id });
+      const sillaName = (ot.chairTypeId as unknown as { name: string }).name;
 
-    for (const item of bom) {
-      const comp = await Component.findById(item.componentId);
-      if (!comp) continue;
+      for (const item of bom) {
+        const comp = await Component.findById(item.componentId);
+        if (!comp) continue;
 
-      const key = comp._id.toString();
-      if (!resultado[key]) {
-        resultado[key] = { componente: { _id: key, name: comp.name }, cantidadReservada: 0, ordenes: [] };
+        const key = comp._id.toString();
+        if (!resultado[key]) {
+          resultado[key] = { componente: { _id: key, name: comp.name }, cantidadReservada: 0, ordenes: [] };
+        }
+        resultado[key].cantidadReservada += item.quantity * ot.quantity;
+        resultado[key].ordenes.push({ id: ot._id.toString(), silla: sillaName, cantidad: ot.quantity });
       }
-      resultado[key].cantidadReservada += item.quantity * ot.quantity;
-      resultado[key].ordenes.push({ id: ot._id.toString(), silla: sillaName, cantidad: ot.quantity });
+    }
+
+    if (ot.items) {
+      for (const item of ot.items) {
+        const comp = await Component.findById(item.componentId);
+        if (!comp) continue;
+
+        const key = comp._id.toString();
+        if (!resultado[key]) {
+          resultado[key] = { componente: { _id: key, name: comp.name }, cantidadReservada: 0, ordenes: [] };
+        }
+        resultado[key].cantidadReservada += item.quantity;
+        resultado[key].ordenes.push({
+          id: ot._id.toString(),
+          silla: ot.chairTypeId ? (ot.chairTypeId as unknown as { name: string }).name : 'Solo repuestos',
+          cantidad: item.quantity,
+        });
+      }
     }
   }
 

@@ -14,12 +14,13 @@ export function canTransition(from: string, to: string): boolean {
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-async function getItems(chairTypeId: string, quantity: number, items?: IWorkOrderItem[]) {
-  const bom = await BOMItem.find({ chairTypeId });
-  const bomItems = bom.map((item) => ({
-    componentId: item.componentId,
-    quantity: item.quantity * quantity,
-  }));
+async function getItems(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
+  const bomItems = chairTypeId
+    ? (await BOMItem.find({ chairTypeId })).map((item) => ({
+        componentId: item.componentId,
+        quantity: item.quantity * quantity,
+      }))
+    : [];
   const extras = (items ?? []).map((i) => ({
     componentId: i.componentId,
     quantity: i.quantity,
@@ -27,7 +28,7 @@ async function getItems(chairTypeId: string, quantity: number, items?: IWorkOrde
   return [...bomItems, ...extras];
 }
 
-export async function reservarStock(chairTypeId: string, quantity: number, items?: IWorkOrderItem[]) {
+export async function reservarStock(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
   const compList = await getItems(chairTypeId, quantity, items);
   if (!compList.length) throw ApiError.badRequest('La orden no tiene componentes definidos');
 
@@ -64,9 +65,9 @@ export async function reservarStock(chairTypeId: string, quantity: number, items
   }
 }
 
-export async function descontarStock(chairTypeId: string, quantity: number, workOrderId: string, items?: IWorkOrderItem[]) {
+export async function descontarStock(chairTypeId: string | undefined, quantity: number, workOrderId: string, items?: IWorkOrderItem[]) {
   const compList = await getItems(chairTypeId, quantity, items);
-  const chairType = await ChairType.findById(chairTypeId);
+  const chairType = chairTypeId ? await ChairType.findById(chairTypeId) : null;
 
   for (const item of compList) {
     await Component.findByIdAndUpdate(item.componentId, {
@@ -74,16 +75,20 @@ export async function descontarStock(chairTypeId: string, quantity: number, work
     });
   }
 
+  const label = chairType
+    ? `Silla ${chairType.name ?? ''} x${quantity}`
+    : `Repuestos x${quantity}`;
+
   await StockMovement.create({
     type: 'egreso',
     quantity,
     referenceType: 'work-order',
     referenceId: workOrderId,
-    notes: `Silla ${chairType?.name ?? ''} x${quantity} (OT #${workOrderId.slice(-6)})`,
+    notes: `${label} (OT #${workOrderId.slice(-6)})`,
   });
 }
 
-export async function liberarReserva(chairTypeId: string, quantity: number, items?: IWorkOrderItem[]) {
+export async function liberarReserva(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
   const compList = await getItems(chairTypeId, quantity, items);
 
   for (const item of compList) {

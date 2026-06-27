@@ -23,13 +23,15 @@ export async function getDetalle(req: Request, res: Response) {
   const ot = await WorkOrder.findById(req.params.id).populate('chairTypeId', 'name');
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
 
-  const bom = await BOMItem.find({ chairTypeId: ot.chairTypeId._id }).populate('componentId', 'name unit tipo subtipo marca');
-  const bomItems = bom.map((item) => ({
-    componentId: item.componentId,
-    quantity: item.quantity * ot.quantity,
-    unit: (item.componentId as unknown as { unit: string })?.unit ?? '',
-    tipo: 'bom',
-  }));
+  const bom = ot.chairTypeId
+    ? (await BOMItem.find({ chairTypeId: ot.chairTypeId._id }).populate('componentId', 'name unit tipo subtipo marca'))
+      .map((item) => ({
+        componentId: item.componentId,
+        quantity: item.quantity * ot.quantity,
+        unit: (item.componentId as unknown as { unit: string })?.unit ?? '',
+        tipo: 'bom',
+      }))
+    : [];
 
   let extraItems: Record<string, unknown>[] = [];
   if (ot.items && ot.items.length > 0) {
@@ -42,7 +44,7 @@ export async function getDetalle(req: Request, res: Response) {
     }));
   }
 
-  res.json({ data: { orden: ot, items: [...bomItems, ...extraItems] } });
+  res.json({ data: { orden: ot, items: [...bom, ...extraItems] } });
 }
 
 export async function create(req: Request, res: Response) {
@@ -64,16 +66,16 @@ export async function updateStatus(req: Request, res: Response) {
   switch (status) {
     case 'en_progreso':
       if (ot.status === 'pendiente') {
-        await reservarStock(ot.chairTypeId.toString(), ot.quantity, ot.items);
+        await reservarStock(ot.chairTypeId?.toString(), ot.quantity, ot.items);
       }
       break;
     case 'finalizada':
-      await descontarStock(ot.chairTypeId.toString(), ot.quantity, ot._id.toString(), ot.items);
+      await descontarStock(ot.chairTypeId?.toString(), ot.quantity, ot._id.toString(), ot.items);
       ot.finalizedAt = new Date();
       break;
     case 'cancelada':
       if (ot.status === 'en_progreso' || ot.status === 'pausada') {
-        await liberarReserva(ot.chairTypeId.toString(), ot.quantity, ot.items);
+        await liberarReserva(ot.chairTypeId?.toString(), ot.quantity, ot.items);
       }
       break;
   }

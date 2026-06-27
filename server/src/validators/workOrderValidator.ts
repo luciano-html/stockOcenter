@@ -7,10 +7,15 @@ const workOrderItemSchema = z.object({
 });
 
 export const createWorkOrderSchema = z.object({
-  chairTypeId: z.string().length(24, 'ID de tipo de silla inválido'),
+  chairTypeId: z.string().length(24, 'ID de tipo de silla inválido').optional(),
   quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
   items: z.array(workOrderItemSchema).optional(),
-});
+}).refine((data) => {
+  if (!data.chairTypeId && (!data.items || data.items.length === 0)) {
+    return false;
+  }
+  return true;
+}, { message: 'Debe seleccionar un tipo de silla o agregar al menos un repuesto' });
 
 export const workOrderParamsSchema = z.object({
   id: z.string().length(24, 'ID inválido'),

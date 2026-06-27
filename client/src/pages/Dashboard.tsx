@@ -215,7 +215,7 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell>
                           {m.referenceType === 'work-order' && m.referenceId && (
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id}`)}>
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id ?? m.referenceId}`)}>
                               <Eye size={16} />
                             </Button>
                           )}
