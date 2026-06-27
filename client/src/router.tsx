@@ -14,6 +14,8 @@ const OrdenesTrabajoList = lazy(() => import('@/pages/ordenes-trabajo/OrdenesTra
 const OrdenTrabajoForm = lazy(() => import('@/pages/ordenes-trabajo/OrdenTrabajoForm'))
 const OrdenTrabajoDetail = lazy(() => import('@/pages/ordenes-trabajo/OrdenTrabajoDetail'))
 const IngresoStock = lazy(() => import('@/pages/IngresoStock'))
+const UsuariosList = lazy(() => import('@/pages/usuarios/UsuariosList'))
+const PerfilForm = lazy(() => import('@/pages/perfil/PerfilForm'))
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Skeleton className="h-96" />}>{children}</Suspense>
@@ -39,6 +41,8 @@ const router = createBrowserRouter([
       { path: 'ordenes-trabajo', element: <SuspenseWrapper><OrdenesTrabajoList /></SuspenseWrapper> },
       { path: 'ordenes-trabajo/nuevo', element: <SuspenseWrapper><OrdenTrabajoForm /></SuspenseWrapper> },
       { path: 'ordenes-trabajo/:id', element: <SuspenseWrapper><OrdenTrabajoDetail /></SuspenseWrapper> },
+      { path: 'usuarios', element: <SuspenseWrapper><UsuariosList /></SuspenseWrapper> },
+      { path: 'perfil', element: <SuspenseWrapper><PerfilForm /></SuspenseWrapper> },
     ],
   },
 ])

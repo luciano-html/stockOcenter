@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  LayoutDashboard, Package, ArmchairIcon, ClipboardList, LogOut, X, Truck,
+  LayoutDashboard, Package, ArmchairIcon, ClipboardList, LogOut, X, Truck, Users, User,
 } from 'lucide-react'
 
 const links = [
@@ -15,6 +15,7 @@ const links = [
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = useAuth()
+  const isAdmin = user?.role === 'admin'
 
   return (
     <>
@@ -54,15 +55,45 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           ))}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border space-y-2">
-          <p className="text-xs text-sidebar-foreground">
-            {user?.name} <span className="capitalize">({user?.role})</span>
-          </p>
+        <div className="p-4 border-t border-sidebar-border space-y-1">
+          {isAdmin && (
+            <NavLink
+              to="/usuarios"
+              onClick={onClose}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                  isActive
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                )
+              }
+            >
+              <Users size={18} />
+              Usuarios
+            </NavLink>
+          )}
+          <NavLink
+            to="/perfil"
+            onClick={onClose}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                isActive
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )
+            }
+          >
+            <User size={18} />
+            Mi perfil
+          </NavLink>
           <button
             onClick={logout}
-            className="flex items-center gap-2 text-sm text-sidebar-foreground hover:text-sidebar-primary cursor-pointer"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full cursor-pointer"
           >
-            <LogOut size={16} /> Cerrar sesión
+            <LogOut size={18} />
+            Cerrar sesión
           </button>
         </div>
       </aside>
