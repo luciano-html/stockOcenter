@@ -9,8 +9,18 @@ export async function list(req: Request, res: Response) {
   if (componenteId) {
     const bomItems = await BOMItem.find({ componentId: componenteId }).select('chairTypeId');
     const chairTypeIds = [...new Set(bomItems.map((b) => b.chairTypeId.toString()))];
-    const workOrders = await mongoose.model('WorkOrder').find({ chairTypeId: { $in: chairTypeIds } }).select('_id');
-    const workOrderIds = workOrders.map((wo) => wo._id);
+
+    const [bomWorkOrders, itemsWorkOrders] = await Promise.all([
+      mongoose.model('WorkOrder').find({ chairTypeId: { $in: chairTypeIds } }).select('_id'),
+      mongoose.model('WorkOrder').find({ 'items.componentId': componenteId }).select('_id'),
+    ]);
+
+    const workOrderIds = [
+      ...new Set([
+        ...bomWorkOrders.map((wo) => wo._id),
+        ...itemsWorkOrders.map((wo) => wo._id),
+      ]),
+    ];
 
     filter.$or = [
       { componentId: componenteId },

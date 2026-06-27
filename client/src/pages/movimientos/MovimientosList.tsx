@@ -22,7 +22,7 @@ export default function MovimientosList() {
 
   const { data, isLoading } = useQuery<{ data: StockMovement[]; pagination: Pagination }>({
     queryKey: ['movimientos', filters],
-    queryFn: () => api.get('/movimientos', { params: filters }).then((r) => r.data),
+    queryFn: () => api.get('/stock/movimientos', { params: filters }).then((r) => r.data),
   })
 
   function buscar() { setFilters({ ...params, page: 1 }) }

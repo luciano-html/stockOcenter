@@ -31,6 +31,7 @@ export default function IngresoStock() {
   const [movFilters, setMovFilters] = useState(movParams)
 
   const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const [confirmAction, setConfirmAction] = useState<'ingreso' | 'egreso' | null>(null)
 
   const { data: compData } = useQuery<{ data: Componente[] }>({
@@ -64,10 +65,15 @@ export default function IngresoStock() {
     onSuccess: () => {
       invalidateAll()
       setSuccessMsg('✓ Stock cargado correctamente')
+      setErrorMsg('')
       setIngresoComp('')
       setIngresoCant('1')
       setIngresoNotas('')
       setTimeout(() => setSuccessMsg(''), 3000)
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      setErrorMsg(err?.response?.data?.message ?? 'Error al cargar stock')
+      setTimeout(() => setErrorMsg(''), 5000)
     },
   })
 
@@ -76,10 +82,15 @@ export default function IngresoStock() {
     onSuccess: () => {
       invalidateAll()
       setSuccessMsg('✓ Egreso registrado correctamente')
+      setErrorMsg('')
       setEgresoComp('')
       setEgresoCant('1')
       setEgresoNotas('')
       setTimeout(() => setSuccessMsg(''), 3000)
+    },
+    onError: (err: { response?: { data?: { message?: string } } }) => {
+      setErrorMsg(err?.response?.data?.message ?? 'Error al registrar egreso')
+      setTimeout(() => setErrorMsg(''), 5000)
     },
   })
 
@@ -175,6 +186,9 @@ export default function IngresoStock() {
 
         {successMsg && (
           <p className="text-sm text-green-600 text-center font-medium">{successMsg}</p>
+        )}
+        {errorMsg && (
+          <p className="text-sm text-destructive text-center font-medium">{errorMsg}</p>
         )}
       </div>
 

@@ -24,7 +24,6 @@ app.use('/api/componentes', componentRoutes);
 app.use('/api/tipos-silla', chairTypeRoutes);
 app.use('/api/ordenes-trabajo', workOrderRoutes);
 app.use('/api/stock', stockRoutes);
-app.use('/api', stockRoutes); // /api/movimientos
 
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/dist/index.html'));

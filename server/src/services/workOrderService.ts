@@ -32,36 +32,28 @@ export async function reservarStock(chairTypeId: string | undefined, quantity: n
   const compList = await getItems(chairTypeId, quantity, items);
   if (!compList.length) throw ApiError.badRequest('La orden no tiene componentes definidos');
 
-  const updates: { componentId: string; name: string; disponible: number; necesario: number }[] = [];
+  const reservados: { componentId: string; quantity: number }[] = [];
 
   for (const item of compList) {
-    const comp = await Component.findById(item.componentId);
-    if (!comp) throw ApiError.notFound(`Componente ${item.componentId} no encontrado`);
+    const result = await Component.findOneAndUpdate(
+      {
+        _id: item.componentId,
+        $expr: { $gte: [{ $subtract: ['$stockActual', '$stockReservado'] }, item.quantity] },
+      },
+      { $inc: { stockReservado: item.quantity } },
+      { new: true }
+    );
 
-    const necesario = item.quantity;
-    const disponible = comp.stockActual - comp.stockReservado;
-
-    if (disponible < necesario) {
-      updates.push({
-        componentId: comp._id.toString(),
-        name: comp.name,
-        disponible,
-        necesario,
-      });
+    if (!result) {
+      for (const r of reservados) {
+        await Component.findByIdAndUpdate(r.componentId, {
+          $inc: { stockReservado: -r.quantity },
+        });
+      }
+      throw ApiError.badRequest(`Stock insuficiente para el componente (id: ${item.componentId})`);
     }
-  }
 
-  if (updates.length > 0) {
-    const detalles = updates
-      .map((u) => `${u.name}: disponible ${u.disponible}, necesario ${u.necesario}`)
-      .join('; ');
-    throw ApiError.badRequest(`Stock insuficiente: ${detalles}`);
-  }
-
-  for (const item of compList) {
-    await Component.findByIdAndUpdate(item.componentId, {
-      $inc: { stockReservado: item.quantity },
-    });
+    reservados.push({ componentId: item.componentId.toString(), quantity: item.quantity });
   }
 }
 
@@ -79,13 +71,26 @@ export async function descontarStock(chairTypeId: string | undefined, quantity: 
     ? `Silla ${chairType.name ?? ''} x${quantity}`
     : `Repuestos x${quantity}`;
 
-  await StockMovement.create({
-    type: 'egreso',
-    quantity,
-    referenceType: 'work-order',
-    referenceId: workOrderId,
-    notes: `${label} (OT #${workOrderId.slice(-6)})`,
-  });
+  if (compList.length === 0) {
+    await StockMovement.create({
+      type: 'egreso',
+      quantity,
+      referenceType: 'work-order',
+      referenceId: workOrderId,
+      notes: `${label} (OT #${workOrderId.slice(-6)})`,
+    });
+  } else {
+    await StockMovement.insertMany(
+      compList.map((item) => ({
+        type: 'egreso' as const,
+        componentId: item.componentId,
+        quantity: item.quantity,
+        referenceType: 'work-order' as const,
+        referenceId: workOrderId,
+        notes: `${label} — ${item.quantity} unidades (OT #${workOrderId.slice(-6)})`,
+      }))
+    );
+  }
 }
 
 export async function liberarReserva(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {

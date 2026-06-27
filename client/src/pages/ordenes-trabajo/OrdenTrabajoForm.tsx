@@ -25,9 +25,9 @@ export default function OrdenTrabajoForm() {
   const [adicionales, setAdicionales] = useState<ItemRow[]>([])
   const [repuestos, setRepuestos] = useState<ItemRow[]>([])
   const [newCompAdic, setNewCompAdic] = useState('')
-  const [newCantAdic, setNewCantAdic] = useState('1')
+  const [newCantAdic, setNewCantAdic] = useState('0')
   const [newCompRep, setNewCompRep] = useState('')
-  const [newCantRep, setNewCantRep] = useState('1')
+  const [newCantRep, setNewCantRep] = useState('0')
 
   const { data: tiposData, isLoading } = useQuery<{ data: ChairType[] }>({
     queryKey: ['tipos-silla-select'],
@@ -81,7 +81,6 @@ export default function OrdenTrabajoForm() {
           </div>
         </div>
 
-        {chairTypeId && (
         <div className="border-t pt-4 space-y-3">
           <div className="flex items-center gap-2">
             <Package size={16} className="text-muted-foreground" />
@@ -134,13 +133,12 @@ export default function OrdenTrabajoForm() {
               if (!comp || !newCantAdic || Number(newCantAdic) < 1) return
               setAdicionales([...adicionales, { componentId: newCompAdic, componentName: comp.name, quantity: newCantAdic }])
               setNewCompAdic('')
-              setNewCantAdic('1')
+              setNewCantAdic('0')
             }} disabled={!newCompAdic || !newCantAdic || Number(newCantAdic) < 1}>
               <Plus size={16} />
             </Button>
           </div>
         </div>
-        )}
 
         <div className="border-t pt-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -194,7 +192,7 @@ export default function OrdenTrabajoForm() {
               if (!comp || !newCantRep || Number(newCantRep) < 1) return
               setRepuestos([...repuestos, { componentId: newCompRep, componentName: comp.name, quantity: newCantRep }])
               setNewCompRep('')
-              setNewCantRep('1')
+              setNewCantRep('0')
             }} disabled={!newCompRep || !newCantRep || Number(newCantRep) < 1}>
               <Plus size={16} />
             </Button>
@@ -203,7 +201,7 @@ export default function OrdenTrabajoForm() {
 
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
-          <Button onClick={() => setShowConfirm(true)} disabled={(!chairTypeId && repuestos.length === 0) || mutation.isPending}>
+          <Button onClick={() => setShowConfirm(true)} disabled={(!chairTypeId && adicionales.length === 0 && repuestos.length === 0) || mutation.isPending}>
             {mutation.isPending ? 'Creando...' : 'Crear orden'}
           </Button>
         </div>
@@ -217,7 +215,7 @@ export default function OrdenTrabajoForm() {
         <p className="text-sm text-muted-foreground mb-4">
           {chairTypeId
             ? `Se creará una orden por ${quantity} silla${(Number(quantity) !== 1 ? 's' : '')} ${tiposData?.data.find(t => t._id === chairTypeId)?.name}.`
-            : 'Se creará una orden solo con repuestos.'}
+            : 'Se creará una orden de solo componentes.'}
           {adicionales.length > 0 && ` Incluye ${adicionales.length} adicional(es).`}
           {repuestos.length > 0 && ` Incluye ${repuestos.length} repuesto(s).`}
         </p>

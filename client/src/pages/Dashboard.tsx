@@ -34,13 +34,15 @@ export default function Dashboard() {
   const { data, isLoading } = useQuery<{ data: StockResumen }>({
     queryKey: ['stock-resumen'],
     queryFn: () => api.get('/stock/resumen').then((r) => r.data),
-    refetchInterval: 5000,
+    refetchInterval: 30000,
+    staleTime: 15000,
   })
 
   const { data: movData } = useQuery<{ data: StockMovement[] }>({
     queryKey: ['movimientos-recent'],
     queryFn: () => api.get('/stock/movimientos', { params: { limit: 15 } }).then((r) => r.data),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 15000,
   })
 
   const { data: tiposData } = useQuery<{ data: ChairType[] }>({

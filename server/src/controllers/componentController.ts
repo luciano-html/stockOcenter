@@ -55,7 +55,7 @@ export async function list(_req: Request, res: Response) {
     filter.name = { $regex: search, $options: 'i' };
   }
   if (stockBajo === 'true') {
-    filter.$expr = { $lte: ['$stockActual', '$stockMinimo'] };
+    filter.$expr = { $lte: [{ $subtract: ['$stockActual', '$stockReservado'] }, '$stockMinimo'] };
   }
   if (tipo) filter.tipo = tipo;
   if (subtipo) filter.subtipo = subtipo;

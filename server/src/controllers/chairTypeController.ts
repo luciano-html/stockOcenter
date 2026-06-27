@@ -1,35 +1,28 @@
 import { Request, Response } from 'express';
 import { ChairType, BOMItem, Component } from '../models';
 import { ApiError } from '../utils/ApiError';
+import { calcularSillasPosibles, calcularSillasPosiblesConDetalle, sillasPosiblesPorTipo } from '../services/stockService';
 
 export async function list(_req: Request, res: Response) {
-  const [tipos, componentes] = await Promise.all([
+  const [tipos, sillasPosiblesArr] = await Promise.all([
     ChairType.find().sort({ name: 1 }),
-    Component.find(),
+    sillasPosiblesPorTipo(),
   ]);
 
-  const compMap = new Map(componentes.map((c) => [c._id.toString(), c]));
+  const sillasMap = new Map(sillasPosiblesArr.map((s) => [s._id, s]));
 
   const bomCounts = await BOMItem.aggregate([
-    { $group: { _id: '$chairTypeId', count: { $sum: 1 }, bom: { $push: '$$ROOT' } } },
+    { $group: { _id: '$chairTypeId', count: { $sum: 1 } } },
   ]);
-  const bomMap = new Map(bomCounts.map((c) => [c._id.toString(), c]));
+  const bomCountMap = new Map(bomCounts.map((c) => [c._id.toString(), c.count]));
 
   const data = tipos.map((t) => {
-    const b = bomMap.get(t._id.toString());
-    let sillasPosibles = 0;
-    if (b) {
-      let min = Infinity;
-      for (const item of b.bom) {
-        const comp = compMap.get(item.componentId.toString());
-        if (!comp) { min = 0; break; }
-        const disponible = comp.stockActual - comp.stockReservado;
-        const posibles = Math.floor(disponible / item.quantity);
-        if (posibles < min) min = posibles;
-      }
-      sillasPosibles = min === Infinity ? 0 : min;
-    }
-    return { ...t.toJSON(), bomCount: b?.count ?? 0, sillasPosibles };
+    const s = sillasMap.get(t._id.toString());
+    return {
+      ...t.toJSON(),
+      bomCount: bomCountMap.get(t._id.toString()) ?? 0,
+      sillasPosibles: s?.sillasPosibles ?? 0,
+    };
   });
 
   res.json({ data });
@@ -106,44 +99,12 @@ export async function sillasPosibles(req: Request, res: Response) {
   const tipo = await ChairType.findById(req.params.id);
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
 
-  const bom = await BOMItem.find({ chairTypeId: tipo._id });
-  if (!bom.length) {
-    res.json({ data: { sillasPosibles: 0, limitante: null } });
-    return;
-  }
-
-  const componentIds = bom.map((item) => item.componentId);
-  const componentes = await Component.find({ _id: { $in: componentIds } });
-  const compMap = new Map(componentes.map((c) => [c._id.toString(), c]));
-
-  let minSillas = Infinity;
-  let limitante: { componentId: string; name: string; stockDisponible: number; necesario: number } | null = null;
-
-  for (const item of bom) {
-    const comp = compMap.get(item.componentId.toString());
-    if (!comp) {
-      minSillas = 0;
-      limitante = { componentId: item.componentId.toString(), name: 'Desconocido', stockDisponible: 0, necesario: item.quantity };
-      break;
-    }
-    const disponible = comp.stockActual - comp.stockReservado;
-    const posibles = Math.floor(disponible / item.quantity);
-    if (posibles < minSillas) {
-      minSillas = posibles;
-      limitante = {
-        componentId: comp._id.toString(),
-        name: comp.name,
-        stockDisponible: disponible,
-        necesario: item.quantity,
-      };
-    }
-  }
+  const detalle = await calcularSillasPosiblesConDetalle(tipo._id.toString());
 
   res.json({
     data: {
       chairType: { _id: tipo._id, name: tipo.name },
-      sillasPosibles: minSillas === Infinity ? 0 : minSillas,
-      limitante,
+      ...detalle,
     },
   });
 }
