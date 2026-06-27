@@ -2,11 +2,12 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  LayoutDashboard, Package, ArmchairIcon, ClipboardList, History, LogOut, X,
+  LayoutDashboard, Package, ArmchairIcon, ClipboardList, History, LogOut, X, Truck,
 } from 'lucide-react'
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/ingreso-stock', label: 'Ingreso de stock', icon: Truck },
   { to: '/componentes', label: 'Componentes', icon: Package },
   { to: '/tipos-silla', label: 'Tipos de silla', icon: ArmchairIcon },
   { to: '/ordenes-trabajo', label: 'Órdenes de trabajo', icon: ClipboardList },

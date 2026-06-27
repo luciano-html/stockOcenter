@@ -5,6 +5,7 @@ import { Header } from './Header'
 
 const titles: Record<string, string> = {
   '/': 'Dashboard',
+  '/ingreso-stock': 'Ingreso de stock',
   '/componentes': 'Componentes',
   '/tipos-silla': 'Tipos de silla',
   '/ordenes-trabajo': 'Órdenes de trabajo',

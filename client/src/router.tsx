@@ -13,6 +13,7 @@ const TipoSillaForm = lazy(() => import('@/pages/tipos-silla/TipoSillaForm'))
 const OrdenesTrabajoList = lazy(() => import('@/pages/ordenes-trabajo/OrdenesTrabajoList'))
 const OrdenTrabajoForm = lazy(() => import('@/pages/ordenes-trabajo/OrdenTrabajoForm'))
 const OrdenTrabajoDetail = lazy(() => import('@/pages/ordenes-trabajo/OrdenTrabajoDetail'))
+const IngresoStock = lazy(() => import('@/pages/IngresoStock'))
 const MovimientosList = lazy(() => import('@/pages/movimientos/MovimientosList'))
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute><Layout /></ProtectedRoute>,
     children: [
       { index: true, element: <SuspenseWrapper><Dashboard /></SuspenseWrapper> },
+      { path: 'ingreso-stock', element: <SuspenseWrapper><IngresoStock /></SuspenseWrapper> },
       { path: 'componentes', element: <SuspenseWrapper><ComponentesList /></SuspenseWrapper> },
       { path: 'componentes/nuevo', element: <SuspenseWrapper><ComponenteForm /></SuspenseWrapper> },
       { path: 'componentes/:id', element: <SuspenseWrapper><ComponenteForm /></SuspenseWrapper> },
