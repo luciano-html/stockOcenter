@@ -11,8 +11,10 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 import componentRoutes from './routes/componentRoutes';
+import chairTypeRoutes from './routes/chairTypeRoutes';
 
 app.use('/api/componentes', componentRoutes);
+app.use('/api/tipos-silla', chairTypeRoutes);
 
 app.use(errorHandler);
 
