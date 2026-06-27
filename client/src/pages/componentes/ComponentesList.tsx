@@ -87,7 +87,7 @@ export default function ComponentesList() {
                 <TableRow key={c._id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.marca}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.marca || '—'}</TableCell>
                   <TableCell>{c.unit}</TableCell>
                   <TableCell className="font-bold">{c.stockDisponible}</TableCell>
                   <TableCell>{c.stockMinimo}</TableCell>

@@ -3,7 +3,7 @@ export interface Componente {
   name: string
   description?: string
   tipo: string
-  marca: string
+  marca?: string
   unit: string
   stockActual: number
   stockReservado: number

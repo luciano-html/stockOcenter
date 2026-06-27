@@ -15,7 +15,7 @@ const schema = z.object({
   name: z.string().min(1, 'Requerido'),
   description: z.string().optional(),
   tipo: z.string().min(1, 'Requerido'),
-  marca: z.string().min(1, 'Requerido'),
+  marca: z.string().optional(),
   unit: z.string().min(1, 'Requerido'),
   stockMinimo: z.coerce.number().min(0, 'No puede ser negativo'),
 })
