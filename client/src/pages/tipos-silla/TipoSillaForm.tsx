@@ -13,7 +13,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 
 const schema = z.object({
   name: z.string().min(1, 'Requerido'),
@@ -94,7 +94,7 @@ export default function TipoSillaForm() {
         </form>
 
         <div className="space-y-3">
-          <Label>Lista de materiales (BOM)</Label>
+          <Label>Lista de materiales</Label>
           <div className="flex flex-col sm:flex-row gap-2">
             <Select value={selectedComponent} onChange={(e) => setSelectedComponent(e.target.value)}>
               <option value="">Seleccionar componente...</option>
@@ -113,7 +113,7 @@ export default function TipoSillaForm() {
                   <TableRow>
                     <TableHead>Componente</TableHead>
                     <TableHead>Cantidad</TableHead>
-                    <TableHead className="w-16"></TableHead>
+                    <TableHead className="w-24">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -124,9 +124,14 @@ export default function TipoSillaForm() {
                         <TableCell>{comp?.name ?? b.componentId}</TableCell>
                         <TableCell>{b.quantity}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => removeBOM(b.componentId)}>
-                            <Trash2 size={16} className="text-destructive" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => navigate(`/componentes/${b.componentId}`)}>
+                              <Pencil size={16} />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeBOM(b.componentId)}>
+                              <Trash2 size={16} className="text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )

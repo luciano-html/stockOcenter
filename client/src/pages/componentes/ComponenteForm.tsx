@@ -102,7 +102,7 @@ export default function ComponenteForm() {
               {errors.unit && <p className="text-xs text-destructive">{errors.unit.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stockMinimo">Stock mínimo</Label>
+              <Label htmlFor="stockMinimo">Alerta</Label>
               <Input id="stockMinimo" type="number" {...register('stockMinimo')} />
               {errors.stockMinimo && <p className="text-xs text-destructive">{errors.stockMinimo.message}</p>}
             </div>

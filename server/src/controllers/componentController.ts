@@ -1,6 +1,31 @@
 import { Request, Response } from 'express';
-import { Component } from '../models';
+import { Component, WorkOrder, BOMItem, ChairType } from '../models';
 import { ApiError } from '../utils/ApiError';
+
+export async function reservas(_req: Request, res: Response) {
+  const ordenes = await WorkOrder.find({ status: { $in: ['en_progreso', 'pausada'] } }).populate('chairTypeId', 'name');
+
+  const resultado: Record<string, { componente: { _id: string; name: string }; cantidadReservada: number; ordenes: { id: string; silla: string; cantidad: number }[] }> = {};
+
+  for (const ot of ordenes) {
+    const bom = await BOMItem.find({ chairTypeId: ot.chairTypeId._id });
+    const sillaName = (ot.chairTypeId as unknown as { name: string }).name;
+
+    for (const item of bom) {
+      const comp = await Component.findById(item.componentId);
+      if (!comp) continue;
+
+      const key = comp._id.toString();
+      if (!resultado[key]) {
+        resultado[key] = { componente: { _id: key, name: comp.name }, cantidadReservada: 0, ordenes: [] };
+      }
+      resultado[key].cantidadReservada += item.quantity * ot.quantity;
+      resultado[key].ordenes.push({ id: ot._id.toString(), silla: sillaName, cantidad: ot.quantity });
+    }
+  }
+
+  res.json({ data: Object.values(resultado) });
+}
 
 export async function list(_req: Request, res: Response) {
   const { search, stockBajo, tipo, marca } = _req.query as Record<string, string | undefined>;

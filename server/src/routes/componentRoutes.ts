@@ -13,6 +13,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/reservas', componentController.reservas);
 router.get('/filtros', componentController.filtros);
 router.get(
   '/',

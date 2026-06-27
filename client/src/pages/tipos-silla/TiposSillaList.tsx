@@ -44,7 +44,7 @@ export default function TiposSillaList() {
           <TableHeader>
             <TableRow>
               <TableHead>Nombre</TableHead>
-              <TableHead>Componentes en BOM</TableHead>
+              <TableHead>Componentes en lista</TableHead>
               <TableHead>Activo</TableHead>
               {isAdmin && <TableHead className="w-24">Acciones</TableHead>}
             </TableRow>
@@ -80,7 +80,7 @@ export default function TiposSillaList() {
 
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogHeader><DialogTitle>¿Eliminar tipo de silla?</DialogTitle></DialogHeader>
-        <p className="text-sm text-muted-foreground mb-4">Se eliminará también su BOM. Las OT existentes no se verán afectadas.</p>
+        <p className="text-sm text-muted-foreground mb-4">Se eliminará también su lista de materiales. Las OT existentes no se verán afectadas.</p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
           <Button variant="destructive" onClick={() => deleteId && deleteMutation.mutate(deleteId)}>Eliminar</Button>
