@@ -8,16 +8,16 @@
 
 ---
 
-## Backend — 4/6 fases
+## Backend — 6/6 fases ✅
 
-| # | Fase | Estado | Commit |
-|---|---|---|---|
-| 1 | Scaffolding (Express + TS + estructura) | ✅ | `633611d` |
-| 2 | Modelos MongoDB (6 schemas) | ✅ | `c03fc07` |
-| 3 | CRUD Componentes | ✅ | `f401ec4` |
-| 4 | CRUD Tipos de silla + BOM + sillas posibles | ✅ | `b2ef2c6` |
-| 5 | CRUD Órdenes de trabajo + lógica estados | ✅ | `pendiente` |
-| 6 | Endpoint cálculo sillas + dashboard + auth | ⏳ | — |
+| # | Fase | Estado |
+|---|---|---|
+| 1 | Scaffolding (Express + TS + estructura) | ✅ |
+| 2 | Modelos MongoDB (6 schemas) | ✅ |
+| 3 | CRUD Componentes | ✅ |
+| 4 | CRUD Tipos de silla + BOM + sillas posibles | ✅ |
+| 5 | CRUD Órdenes de trabajo + lógica estados | ✅ |
+| 6 | Auth (login JWT), ingreso stock, resumen dashboard, movimientos, seed | ✅ |
 
 ## Frontend — 0/6 fases
 
@@ -47,4 +47,4 @@
 ---
 
 ## Pendiente próximo paso
-Fase 6 — Endpoint cálculo sillas + dashboard + auth (login, seed de usuario admin)
+Frontend — Fase 7: Scaffolding (Vite + React + shadcn/ui + layout responsive)
