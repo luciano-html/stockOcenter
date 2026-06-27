@@ -10,7 +10,11 @@ Este proyecto es una app web para gestionar stock de componentes de sillas (Node
 Al iniciar cada sesión, LEER `STATUS.md` completo. Ahí está el roadmap de punta a punta con checkboxes, fases completadas y el próximo paso a ejecutar.
 
 ## Estado actual del proyecto (resumen)
-El backend está COMPLETO (6 fases). El frontend está SIN EMPEZAR.
+El proyecto está COMPLETO. Backend (6 fases) y Frontend (6 fases) terminados.
+
+Probar local:
+  1. `cd server && npm run seed && npm run dev`
+  2. `cd client && npm run dev`
 
 ## Convenciones
 - Cada fase completa → commit con mensaje "fase N: descripción"

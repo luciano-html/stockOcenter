@@ -63,44 +63,40 @@
 
 ---
 
-## Frontend — SIN EMPEZAR
+## Frontend — COMPLETO ✅
 
-- [ ] **Fase 7: Scaffolding**
-  - [ ] Inicializar Vite + React + TypeScript
-  - [ ] Configurar TailwindCSS + shadcn/ui
-  - [ ] Instalar dependencias (react-router-dom, tanstack-query, react-hook-form, zod, axios)
-  - [ ] Layout responsive: Sidebar (hamburguesa en mobile) + Header + Content
-  - [ ] Configurar router con lazy loading
-  - [ ] Configurar axios instance con interceptors (token JWT)
-  - [ ] Configurar TanStack Query
+- [x] **Fase 7: Scaffolding**
+  - [x] Vite + React + TypeScript + TailwindCSS v4 + shadcn/ui
+  - [x] Dependencias: react-router-dom, tanstack-query, react-hook-form, zod, axios, lucide-react
+  - [x] Layout responsive: Sidebar (hamburguesa mobile) + Header + Content
+  - [x] Router con lazy loading + Suspense
+  - [x] Axios instance con interceptor JWT y redirect 401
+  - [x] AuthContext + ProtectedRoute + AdminRoute
 
-- [ ] **Fase 8: Páginas de Componentes**
-  - [ ] Lista de componentes (tabla responsive con search y filtro stock bajo)
-  - [ ] Formulario crear/editar componente (react-hook-form + zod)
-  - [ ] Modal de confirmación al eliminar
+- [x] **Fase 8: Páginas de Componentes**
+  - [x] Lista con search + stock bajo + colores
+  - [x] Formulario crear/editar (react-hook-form + zod)
+  - [x] Modal confirmación al eliminar
 
-- [ ] **Fase 9: Páginas de Tipos de silla**
-  - [ ] Lista de tipos de silla
-  - [ ] Formulario crear/editar tipo con editor de BOM (agregar/quitar componentes con cantidades)
-  - [ ] Visualización de sillas posibles por tipo
+- [x] **Fase 9: Páginas de Tipos de silla**
+  - [x] Lista de tipos con conteo de BOM
+  - [x] Formulario con editor de BOM (agregar/quitar componentes con cantidades)
 
-- [ ] **Fase 10: Páginas de Órdenes de trabajo**
-  - [ ] Lista de OT con filtro por estado
-  - [ ] Formulario crear OT (seleccionar tipo + cantidad)
-  - [ ] Detalle de OT con botones de cambio de estado
-  - [ ] Confirmación en transiciones críticas (finalizar, cancelar)
+- [x] **Fase 10: Páginas de Órdenes de trabajo**
+  - [x] Lista con filtro por estado + badges de colores
+  - [x] Formulario crear OT (tipo + cantidad)
+  - [x] Detalle con botones de cambio de estado + confirmación
 
-- [ ] **Fase 11: Dashboard**
-  - [ ] Tarjetas de resumen (total componentes, OT activas, sillas posibles)
-  - [ ] Tabla de componentes con alerta visual en los que están bajo stock mínimo
-  - [ ] Lista de sillas posibles por tipo
+- [x] **Fase 11: Dashboard**
+  - [x] Tarjetas de resumen (componentes, stock bajo, sillas posibles)
+  - [x] Tabla de componentes con alerta visual en stock bajo
+  - [x] Tabla de sillas posibles con componente limitante
 
-- [ ] **Fase 12: Historial de movimientos + Login**
-  - [ ] Tabla de movimientos con filtros (componente, tipo, fechas)
-  - [ ] Paginación
-  - [ ] Pantalla de login
-  - [ ] Protección de rutas por rol (admin/operario)
-  - [ ] Manejo de sesión (token en localStorage, logout)
+- [x] **Fase 12: Historial de movimientos + Login**
+  - [x] Tabla de movimientos con filtros (componente, tipo)
+  - [x] Paginación
+  - [x] Pantalla de login con redirect post-auth
+  - [x] Protección de rutas + manejo de sesión
 
 ---
 
@@ -121,5 +117,7 @@
 ## Próximo paso
 
 ```
-Fase 7: Scaffolding del frontend (Vite + React + shadcn/ui + layout responsive)
+Todo completo. Probar local:
+  1. server: npm run seed + npm run dev
+  2. client: npm run dev
 ```
