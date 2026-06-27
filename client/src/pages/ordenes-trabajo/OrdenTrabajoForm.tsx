@@ -15,19 +15,21 @@ import { Plus, Trash2, Package, Wrench } from 'lucide-react'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 type ItemRow = { componentId: string; componentName: string; quantity: string }
+type TipoOrden = 'silla' | 'repuestos'
 
 export default function OrdenTrabajoForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [showConfirm, setShowConfirm] = useState(false)
+  const [tipoOrden, setTipoOrden] = useState<TipoOrden>('silla')
   const [chairTypeId, setChairTypeId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [adicionales, setAdicionales] = useState<ItemRow[]>([])
   const [repuestos, setRepuestos] = useState<ItemRow[]>([])
   const [newCompAdic, setNewCompAdic] = useState('')
-  const [newCantAdic, setNewCantAdic] = useState('0')
+  const [newCantAdic, setNewCantAdic] = useState('1')
   const [newCompRep, setNewCompRep] = useState('')
-  const [newCantRep, setNewCantRep] = useState('0')
+  const [newCantRep, setNewCantRep] = useState('1')
 
   const { data: tiposData, isLoading } = useQuery<{ data: ChairType[] }>({
     queryKey: ['tipos-silla-select'],
@@ -41,7 +43,7 @@ export default function OrdenTrabajoForm() {
 
   const mutation = useMutation({
     mutationFn: () => api.post('/ordenes-trabajo', {
-      ...(chairTypeId ? { chairTypeId } : {}),
+      ...(tipoOrden === 'silla' && chairTypeId ? { chairTypeId } : {}),
       quantity: Number(quantity),
       items: [
         ...adicionales.map((i) => ({ componentId: i.componentId, quantity: Number(i.quantity), type: 'adicional' as const })),
@@ -56,6 +58,11 @@ export default function OrdenTrabajoForm() {
     },
   })
 
+  function puedeCrear() {
+    if (tipoOrden === 'silla') return !!chairTypeId
+    return repuestos.length > 0
+  }
+
   if (isLoading) return <Skeleton className="h-64" />
 
   return (
@@ -64,28 +71,64 @@ export default function OrdenTrabajoForm() {
     <Card className="max-w-2xl mx-auto">
       <CardHeader><CardTitle>Nueva orden de trabajo</CardTitle></CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="chairTypeId">Tipo de silla <span className="text-xs text-muted-foreground">(opcional)</span></Label>
-            <Select id="chairTypeId" value={chairTypeId} onChange={(e) => setChairTypeId(e.target.value)}>
-              <option value="">Solo repuestos</option>
-              {tiposData?.data.filter((t) => t.active).map((t) => (
-                <option key={t._id} value={t._id}>{t.name}</option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Cantidad</Label>
-            <Input id="quantity" type="text" inputMode="numeric" value={quantity}
-              onChange={(e) => setQuantity(e.target.value.replace(/\D/g, ''))} />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="tipoOrden">Tipo de orden</Label>
+          <Select id="tipoOrden" value={tipoOrden} onChange={(e) => { setTipoOrden(e.target.value as TipoOrden); setChairTypeId(''); setAdicionales([]) }}>
+            <option value="silla">Silla + adicionales</option>
+            <option value="repuestos">Solo repuestos</option>
+          </Select>
         </div>
 
+        {tipoOrden === 'silla' && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="chairTypeId">Tipo de silla</Label>
+              <Select id="chairTypeId" value={chairTypeId} onChange={(e) => setChairTypeId(e.target.value)}>
+                <option value="">Seleccionar...</option>
+                {tiposData?.data.filter((t) => t.active).map((t) => (
+                  <option key={t._id} value={t._id}>{t.name}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Cantidad</Label>
+              <Input id="quantity" type="text" inputMode="numeric" value={quantity}
+                onChange={(e) => setQuantity(e.target.value.replace(/\D/g, ''))} />
+            </div>
+          </div>
+        )}
+
+        {(tipoOrden === 'silla') && (
         <div className="border-t pt-4 space-y-3">
           <div className="flex items-center gap-2">
             <Package size={16} className="text-muted-foreground" />
             <Label className="text-sm font-medium">Adicionales a la silla</Label>
-            <span className="text-xs text-muted-foreground">(componentes extra que forman parte de la silla, ej. aro prolongador)</span>
+            <span className="text-xs text-muted-foreground">(opcional — componentes extra que forman parte de la silla)</span>
+          </div>
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <Select value={newCompAdic} onChange={(e) => setNewCompAdic(e.target.value)}>
+                <option value="">Seleccionar componente...</option>
+                {compData?.data.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name} ({c.tipo}{c.marca ? ` - ${c.marca}` : ''}) — disp. {c.stockDisponible} {c.unit}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="w-24">
+              <Input type="text" inputMode="numeric" placeholder="Cant." value={newCantAdic}
+                onChange={(e) => setNewCantAdic(e.target.value.replace(/\D/g, ''))} />
+            </div>
+            <Button variant="outline" size="icon" onClick={() => {
+              const comp = compData?.data.find((c) => c._id === newCompAdic)
+              if (!comp || !newCantAdic || Number(newCantAdic) < 1) return
+              setAdicionales([...adicionales, { componentId: newCompAdic, componentName: comp.name, quantity: newCantAdic }])
+              setNewCompAdic('')
+              setNewCantAdic('1')
+            }} disabled={!newCompAdic || !newCantAdic || Number(newCantAdic) < 1}>
+              <Plus size={16} />
+            </Button>
           </div>
           {adicionales.length > 0 && (
             <div className="rounded-md border overflow-x-auto">
@@ -113,9 +156,18 @@ export default function OrdenTrabajoForm() {
               </Table>
             </div>
           )}
+        </div>
+        )}
+
+        <div className="border-t pt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Wrench size={16} className="text-muted-foreground" />
+            <Label className="text-sm font-medium">Repuestos</Label>
+            <span className="text-xs text-muted-foreground">(componentes sueltos{tipoOrden === 'silla' ? ', opcional' : ''})</span>
+          </div>
           <div className="flex gap-2 items-end">
             <div className="flex-1">
-              <Select value={newCompAdic} onChange={(e) => setNewCompAdic(e.target.value)}>
+              <Select value={newCompRep} onChange={(e) => setNewCompRep(e.target.value)}>
                 <option value="">Seleccionar componente...</option>
                 {compData?.data.map((c) => (
                   <option key={c._id} value={c._id}>
@@ -125,26 +177,18 @@ export default function OrdenTrabajoForm() {
               </Select>
             </div>
             <div className="w-24">
-              <Input type="text" inputMode="numeric" placeholder="Cant." value={newCantAdic}
-                onChange={(e) => setNewCantAdic(e.target.value.replace(/\D/g, ''))} />
+              <Input type="text" inputMode="numeric" placeholder="Cant." value={newCantRep}
+                onChange={(e) => setNewCantRep(e.target.value.replace(/\D/g, ''))} />
             </div>
             <Button variant="outline" size="icon" onClick={() => {
-              const comp = compData?.data.find((c) => c._id === newCompAdic)
-              if (!comp || !newCantAdic || Number(newCantAdic) < 1) return
-              setAdicionales([...adicionales, { componentId: newCompAdic, componentName: comp.name, quantity: newCantAdic }])
-              setNewCompAdic('')
-              setNewCantAdic('0')
-            }} disabled={!newCompAdic || !newCantAdic || Number(newCantAdic) < 1}>
+              const comp = compData?.data.find((c) => c._id === newCompRep)
+              if (!comp || !newCantRep || Number(newCantRep) < 1) return
+              setRepuestos([...repuestos, { componentId: newCompRep, componentName: comp.name, quantity: newCantRep }])
+              setNewCompRep('')
+              setNewCantRep('1')
+            }} disabled={!newCompRep || !newCantRep || Number(newCantRep) < 1}>
               <Plus size={16} />
             </Button>
-          </div>
-        </div>
-
-        <div className="border-t pt-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Wrench size={16} className="text-muted-foreground" />
-            <Label className="text-sm font-medium">Repuestos</Label>
-            <span className="text-xs text-muted-foreground">(componentes sueltos no vinculados a la silla, ej. ruedas extra)</span>
           </div>
           {repuestos.length > 0 && (
             <div className="rounded-md border overflow-x-auto">
@@ -172,36 +216,11 @@ export default function OrdenTrabajoForm() {
               </Table>
             </div>
           )}
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <Select value={newCompRep} onChange={(e) => setNewCompRep(e.target.value)}>
-                <option value="">Seleccionar componente...</option>
-                {compData?.data.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} ({c.tipo}{c.marca ? ` - ${c.marca}` : ''}) — disp. {c.stockDisponible} {c.unit}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="w-24">
-              <Input type="text" inputMode="numeric" placeholder="Cant." value={newCantRep}
-                onChange={(e) => setNewCantRep(e.target.value.replace(/\D/g, ''))} />
-            </div>
-            <Button variant="outline" size="icon" onClick={() => {
-              const comp = compData?.data.find((c) => c._id === newCompRep)
-              if (!comp || !newCantRep || Number(newCantRep) < 1) return
-              setRepuestos([...repuestos, { componentId: newCompRep, componentName: comp.name, quantity: newCantRep }])
-              setNewCompRep('')
-              setNewCantRep('0')
-            }} disabled={!newCompRep || !newCantRep || Number(newCantRep) < 1}>
-              <Plus size={16} />
-            </Button>
-          </div>
         </div>
 
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
-          <Button onClick={() => setShowConfirm(true)} disabled={(!chairTypeId && adicionales.length === 0 && repuestos.length === 0) || mutation.isPending}>
+          <Button onClick={() => setShowConfirm(true)} disabled={!puedeCrear() || mutation.isPending}>
             {mutation.isPending ? 'Creando...' : 'Crear orden'}
           </Button>
         </div>
@@ -213,9 +232,9 @@ export default function OrdenTrabajoForm() {
           <DialogTitle>¿Crear orden de trabajo?</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground mb-4">
-          {chairTypeId
+          {tipoOrden === 'silla'
             ? `Se creará una orden por ${quantity} silla${(Number(quantity) !== 1 ? 's' : '')} ${tiposData?.data.find(t => t._id === chairTypeId)?.name}.`
-            : 'Se creará una orden de solo componentes.'}
+            : 'Se creará una orden de solo repuestos.'}
           {adicionales.length > 0 && ` Incluye ${adicionales.length} adicional(es).`}
           {repuestos.length > 0 && ` Incluye ${repuestos.length} repuesto(s).`}
         </p>
