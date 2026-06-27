@@ -16,7 +16,7 @@
 | 2 | Modelos MongoDB (6 schemas) | ✅ | `c03fc07` |
 | 3 | CRUD Componentes | ✅ | `f401ec4` |
 | 4 | CRUD Tipos de silla + BOM + sillas posibles | ✅ | `b2ef2c6` |
-| 5 | CRUD Órdenes de trabajo + lógica estados | ⏳ | — |
+| 5 | CRUD Órdenes de trabajo + lógica estados | ✅ | `pendiente` |
 | 6 | Endpoint cálculo sillas + dashboard + auth | ⏳ | — |
 
 ## Frontend — 0/6 fases
@@ -47,4 +47,4 @@
 ---
 
 ## Pendiente próximo paso
-Fase 5 — CRUD Órdenes de trabajo + lógica de estados (reserva/descuento/liberación de stock)
+Fase 6 — Endpoint cálculo sillas + dashboard + auth (login, seed de usuario admin)

@@ -12,9 +12,11 @@ app.use(morgan('dev'));
 
 import componentRoutes from './routes/componentRoutes';
 import chairTypeRoutes from './routes/chairTypeRoutes';
+import workOrderRoutes from './routes/workOrderRoutes';
 
 app.use('/api/componentes', componentRoutes);
 app.use('/api/tipos-silla', chairTypeRoutes);
+app.use('/api/ordenes-trabajo', workOrderRoutes);
 
 app.use(errorHandler);
 
