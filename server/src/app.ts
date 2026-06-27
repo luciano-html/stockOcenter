@@ -10,7 +10,9 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Rutas (se agregarán en fases siguientes)
+import componentRoutes from './routes/componentRoutes';
+
+app.use('/api/componentes', componentRoutes);
 
 app.use(errorHandler);
 
