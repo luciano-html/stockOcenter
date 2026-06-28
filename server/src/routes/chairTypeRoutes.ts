@@ -6,13 +6,14 @@ import {
   createChairTypeSchema,
   updateChairTypeSchema,
   chairTypeParamsSchema,
+  listChairTypesQuerySchema,
 } from '../validators/chairTypeValidator';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.get('/', chairTypeController.list);
+router.get('/', validate(listChairTypesQuerySchema, 'query'), chairTypeController.list);
 router.get('/:id/sillas-posibles', validate(chairTypeParamsSchema, 'params'), chairTypeController.sillasPosibles);
 router.get('/:id/bom-detalle', validate(chairTypeParamsSchema, 'params'), chairTypeController.bomDetalle);
 router.get('/:id', validate(chairTypeParamsSchema, 'params'), chairTypeController.getById);
