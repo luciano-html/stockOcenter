@@ -25,7 +25,14 @@ Admin: `admin / admin123` — Solo existe Link con 9 componentes (Rolic, alerta=
 Seed eliminado. La app persiste datos en MongoDB.
 
 ## 📝 Commit policy
-Los commits se hacen automáticamente cuando la IA considera que hay un cambio significativo (feature completa, fix importante, refactor). Sin intervención del usuario.
+Los commits son **semi-automáticos**:
+
+1. La IA prepara el commit cuando hay un cambio significativo (feature completa, fix importante, refactor).
+2. Antes de commitear, la IA muestra `git status` + `git diff --stat` (y el diff si es necesario) para revisión del usuario.
+3. El usuario confirma explícitamente antes de ejecutar `git commit` y `git push`.
+4. Cada commit debe agrupar un cambio lógico coherente. No mezclar feature + fix + refactor en un mismo commit.
+5. Usar **Conventional Commits**. Ver guía en `docs/sdd/12-conventional-commits.md`.
+6. Nunca commitear builds, logs, archivos temporales ni credenciales. Revisar `.gitignore` antes de confirmar.
 
 ## 📝 Documentar en STATUS.md
 Todo cambio relevante se documenta en la sección **Changelog** de `STATUS.md` con formato:
