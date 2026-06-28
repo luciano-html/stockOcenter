@@ -29,7 +29,7 @@ const workOrderItemSchema = new Schema<IWorkOrderItem>(
 
 const workOrderSchema = new Schema<IWorkOrder>(
   {
-    chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: false },
+    chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: false, index: true },
     quantity: { type: Number, required: true, min: 1 },
     items: { type: [workOrderItemSchema] },
     status: {
@@ -37,10 +37,13 @@ const workOrderSchema = new Schema<IWorkOrder>(
       required: true,
       enum: ['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada'],
       default: 'pendiente',
+      index: true,
     },
     finalizedAt: { type: Date },
   },
   { timestamps: true }
 );
+
+workOrderSchema.index({ status: 1, createdAt: -1 });
 
 export const WorkOrder = mongoose.model<IWorkOrder>('WorkOrder', workOrderSchema);

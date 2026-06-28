@@ -1,19 +1,20 @@
 import { z } from 'zod';
+import { objectIdSchema } from './common';
 
 export const ingresoStockSchema = z.object({
-  componenteId: z.string().length(24, 'ID de componente inválido'),
+  componenteId: objectIdSchema,
   cantidad: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
   notas: z.string().trim().optional(),
 });
 
 export const egresoStockSchema = z.object({
-  componenteId: z.string().length(24, 'ID de componente inválido'),
+  componenteId: objectIdSchema,
   cantidad: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
   notas: z.string().trim().optional(),
 });
 
 export const movimientosQuerySchema = z.object({
-  componenteId: z.string().length(24).optional(),
+  componenteId: objectIdSchema.optional(),
   tipo: z.enum(['ingreso', 'egreso']).optional(),
   desde: z.string().optional(),
   hasta: z.string().optional(),

@@ -1,6 +1,7 @@
 import { Component, BOMItem, StockMovement, ChairType, WorkOrder } from '../models';
 import { ApiError } from '../utils/ApiError';
 import type { IWorkOrderItem } from '../models/WorkOrder';
+import { clearStockCache } from '../utils/cache';
 
 const TRANSITIONS: Record<string, string[]> = {
   pendiente: ['en_progreso', 'cancelada'],
@@ -16,13 +17,13 @@ export function canTransition(from: string, to: string): boolean {
 
 async function getItems(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
   const bomItems = chairTypeId
-    ? (await BOMItem.find({ chairTypeId })).map((item) => ({
-        componentId: item.componentId,
+    ? (await BOMItem.find({ chairTypeId }).lean()).map((item) => ({
+        componentId: item.componentId.toString(),
         quantity: item.quantity * quantity,
       }))
     : [];
   const extras = (items ?? []).map((i) => ({
-    componentId: i.componentId,
+    componentId: i.componentId.toString(),
     quantity: i.quantity,
   }));
   return [...bomItems, ...extras];
@@ -53,23 +54,39 @@ export async function reservarStock(chairTypeId: string | undefined, quantity: n
       throw ApiError.badRequest(`Stock insuficiente para el componente (id: ${item.componentId})`);
     }
 
-    reservados.push({ componentId: item.componentId.toString(), quantity: item.quantity });
+    reservados.push({ componentId: item.componentId, quantity: item.quantity });
   }
+
+  clearStockCache();
 }
 
-export async function descontarStock(chairTypeId: string | undefined, quantity: number, workOrderId: string, items?: IWorkOrderItem[]) {
+export async function descontarStock(
+  chairTypeId: string | undefined,
+  quantity: number,
+  workOrderId: string,
+  items?: IWorkOrderItem[]
+) {
   const compList = await getItems(chairTypeId, quantity, items);
-  const chairType = chairTypeId ? await ChairType.findById(chairTypeId) : null;
+  const chairType = chairTypeId ? await ChairType.findById(chairTypeId).lean() : null;
+  const descontados: { componentId: string; quantity: number }[] = [];
 
-  for (const item of compList) {
-    await Component.findByIdAndUpdate(item.componentId, {
-      $inc: { stockActual: -item.quantity, stockReservado: -item.quantity },
-    });
+  try {
+    for (const item of compList) {
+      await Component.findByIdAndUpdate(item.componentId, {
+        $inc: { stockActual: -item.quantity, stockReservado: -item.quantity },
+      });
+      descontados.push({ componentId: item.componentId, quantity: item.quantity });
+    }
+  } catch (err) {
+    for (const d of descontados) {
+      await Component.findByIdAndUpdate(d.componentId, {
+        $inc: { stockActual: d.quantity, stockReservado: d.quantity },
+      });
+    }
+    throw err;
   }
 
-  const label = chairType
-    ? `Silla ${chairType.name ?? ''} x${quantity}`
-    : `Repuestos x${quantity}`;
+  const label = chairType ? `Silla ${chairType.name ?? ''} x${quantity}` : `Repuestos x${quantity}`;
 
   if (compList.length === 0) {
     await StockMovement.create({
@@ -91,6 +108,8 @@ export async function descontarStock(chairTypeId: string | undefined, quantity: 
       }))
     );
   }
+
+  clearStockCache();
 }
 
 export async function liberarReserva(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
@@ -101,4 +120,27 @@ export async function liberarReserva(chairTypeId: string | undefined, quantity: 
       $inc: { stockReservado: -item.quantity },
     });
   }
+
+  clearStockCache();
+}
+
+export async function recalcularReservas() {
+  const ordenes = await WorkOrder.find({ status: { $in: ['en_progreso', 'pausada'] } }).lean();
+  const componentes = await Component.find().lean();
+  const reservas: Record<string, number> = {};
+
+  for (const ot of ordenes) {
+    const items = await getItems(ot.chairTypeId?.toString(), ot.quantity, ot.items);
+    for (const item of items) {
+      reservas[item.componentId] = (reservas[item.componentId] ?? 0) + item.quantity;
+    }
+  }
+
+  await Promise.all(
+    componentes.map((c) =>
+      Component.findByIdAndUpdate(c._id, { stockReservado: reservas[c._id.toString()] ?? 0 })
+    )
+  );
+
+  clearStockCache();
 }
