@@ -2,16 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { Componente, ComponenteFiltros } from '@/types'
+import type { Componente, ComponenteFiltros, ReservaItem, Pagination } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Search, Eye, EyeOff } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Eye } from 'lucide-react'
 import { useState } from 'react'
 import { GoBack } from '@/components/shared/GoBack'
 
@@ -21,20 +20,23 @@ export default function ComponentesList() {
   const tipoFiltro = params.get('tipo') ?? ''
   const subtipoFiltro = params.get('subtipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
+  const page = Number(params.get('page') ?? '1')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
 
-  const { data, isLoading } = useQuery<{ data: Componente[] }>({
-    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, marcaFiltro],
+  const { data, isLoading } = useQuery<{ data: Componente[]; pagination: Pagination }>({
+    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, marcaFiltro, page],
     queryFn: () => api.get('/componentes', {
       params: {
         search: search || undefined,
         tipo: tipoFiltro || undefined,
         subtipo: subtipoFiltro || undefined,
         marca: marcaFiltro || undefined,
+        page,
+        limit: 50,
       },
     }).then((r) => r.data),
   })
@@ -49,7 +51,13 @@ export default function ComponentesList() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['componentes'] }); setDeleteId(null) },
   })
 
-  const enReserva = data?.data.filter((c) => c.stockReservado > 0) ?? []
+  const { data: reservasData } = useQuery<{ data: ReservaItem[] }>({
+    queryKey: ['componentes-reservas'],
+    queryFn: () => api.get('/componentes/reservas').then((r) => r.data),
+    refetchInterval: 30000,
+  })
+
+  const reservas = reservasData?.data ?? []
 
   return (
     <div className="space-y-4">
@@ -89,9 +97,9 @@ export default function ComponentesList() {
             {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
         </div>
-        {enReserva.length > 0 && (
+        {reservas.length > 0 && (
           <Button variant="outline" onClick={() => setShowReserved(true)}>
-            <Eye size={16} /> En reserva ({enReserva.length})
+            <Eye size={16} /> En reserva ({reservas.length})
           </Button>
         )}
         {isAdmin && (
@@ -130,7 +138,7 @@ export default function ComponentesList() {
                   <TableCell className="font-bold">{c.stockDisponible}</TableCell>
                   <TableCell>{c.stockMinimo}</TableCell>
                   <TableCell>
-                    {c.stockBajo
+                    {c.stockDisponible <= c.stockMinimo
                       ? <Badge variant="destructive">Stock bajo</Badge>
                       : <Badge variant="secondary">Normal</Badge>
                     }
@@ -157,6 +165,22 @@ export default function ComponentesList() {
         </div>
       )}
 
+      {data?.pagination && data.pagination.totalPages > 1 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1}
+            onClick={() => { const next = new URLSearchParams(params); next.set('page', String(page - 1)); setParams(next, { replace: true }) }}>
+            Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground py-2">
+            Página {page} de {data.pagination.totalPages}
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= data.pagination.totalPages}
+            onClick={() => { const next = new URLSearchParams(params); next.set('page', String(page + 1)); setParams(next, { replace: true }) }}>
+            Siguiente
+          </Button>
+        </div>
+      )}
+
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogHeader><DialogTitle>¿Eliminar componente?</DialogTitle></DialogHeader>
         <p className="text-sm text-muted-foreground mb-4">Esta acción no se puede deshacer.</p>
@@ -167,26 +191,31 @@ export default function ComponentesList() {
       </Dialog>
 
       <Dialog open={showReserved} onOpenChange={setShowReserved}>
-        <DialogHeader><DialogTitle>Componentes en reserva ({enReserva.length})</DialogTitle></DialogHeader>
-        <div className="max-h-[300px] overflow-y-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Componente</TableHead>
-                <TableHead>Reservado</TableHead>
-                <TableHead>Disponible</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {enReserva.map((c) => (
-                <TableRow key={c._id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell className="text-amber-600 font-bold">{c.stockReservado} {c.unit}</TableCell>
-                  <TableCell>{c.stockDisponible} {c.unit}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <DialogHeader><DialogTitle>Componentes en reserva ({reservas.length})</DialogTitle></DialogHeader>
+        <div className="max-h-[400px] overflow-y-auto space-y-4 p-1">
+          {reservas.map((r) => (
+            <div key={r.componente._id} className="border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold">{r.componente.name}</span>
+                <span className="text-amber-600 font-bold text-sm">{r.cantidadReservada} reservado</span>
+              </div>
+              <div className="space-y-1">
+                {r.ordenes.map((ot) => (
+                  <Link
+                    key={ot.id}
+                    to={`/ordenes-trabajo/${ot.id}`}
+                    className="flex items-center justify-between text-sm bg-muted rounded px-2 py-1.5 hover:bg-muted/80 transition-colors"
+                  >
+                    <span className="text-muted-foreground">
+                      OT <span className="font-mono text-xs">{ot.id.slice(-6)}</span>
+                    </span>
+                    <span className="font-medium">{ot.silla}</span>
+                    <span className="text-muted-foreground">x{ot.cantidad}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </Dialog>
     </div>

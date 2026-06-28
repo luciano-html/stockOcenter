@@ -1,8 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { WorkOrder } from '@/types'
+import type { WorkOrder, Pagination } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,13 +22,13 @@ const statusClass: Record<string, string> = {
 
 export default function OrdenesTrabajoList() {
   const [estadoFiltro, setEstadoFiltro] = useState('')
+  const [page, setPage] = useState(1)
   const { user } = useAuth()
-  const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
 
-  const { data, isLoading } = useQuery<{ data: WorkOrder[] }>({
-    queryKey: ['ordenes-trabajo', estadoFiltro],
-    queryFn: () => api.get('/ordenes-trabajo', { params: { estado: estadoFiltro || undefined } }).then((r) => r.data),
+  const { data, isLoading } = useQuery<{ data: WorkOrder[]; pagination: Pagination }>({
+    queryKey: ['ordenes-trabajo', estadoFiltro, page],
+    queryFn: () => api.get('/ordenes-trabajo', { params: { estado: estadoFiltro || undefined, page, limit: 50 } }).then((r) => r.data),
   })
 
   if (isLoading) return <Skeleton className="h-64" />
@@ -37,7 +37,7 @@ export default function OrdenesTrabajoList() {
     <div className="space-y-4">
       <GoBack />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <Select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} className="w-48">
+        <Select value={estadoFiltro} onChange={(e) => { setEstadoFiltro(e.target.value); setPage(1) }} className="w-48">
           <option value="">Todos los estados</option>
           <option value="pendiente">Pendiente</option>
           <option value="en_progreso">En progreso</option>
@@ -91,6 +91,14 @@ export default function OrdenesTrabajoList() {
           </TableBody>
         </Table>
       </div>
+
+      {data?.pagination && data.pagination.totalPages > 1 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</Button>
+          <span className="text-sm text-muted-foreground py-2">Página {page} de {data.pagination.totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= data.pagination.totalPages} onClick={() => setPage(page + 1)}>Siguiente</Button>
+        </div>
+      )}
     </div>
   )
 }

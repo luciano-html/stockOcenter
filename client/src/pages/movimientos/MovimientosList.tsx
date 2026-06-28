@@ -4,7 +4,6 @@ import type { StockMovement, Pagination, Componente } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useState } from 'react'
@@ -75,7 +74,7 @@ export default function MovimientosList() {
                     </TableCell>
                     <TableCell className="font-bold">{m.quantity}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {m.referenceType === 'work-order' ? `OT #${m.referenceId?.slice(-6)}` : '—'}
+                      {m.referenceType === 'work-order' ? `OT #${String(m.referenceId ?? '').slice(-6)}` : '—'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{m.notes ?? '—'}</TableCell>
                   </TableRow>
@@ -87,16 +86,16 @@ export default function MovimientosList() {
             </Table>
           </div>
 
-          {data?.pagination && data.pagination.pages > 1 && (
+          {data?.pagination && data.pagination.totalPages > 1 && (
             <div className="flex justify-center gap-2">
               <Button variant="outline" size="sm" disabled={filters.page <= 1}
                 onClick={() => setFilters({ ...filters, page: filters.page - 1 })}>
                 Anterior
               </Button>
               <span className="flex items-center text-sm text-muted-foreground">
-                Pág. {filters.page} de {data.pagination.pages}
+                Pág. {filters.page} de {data.pagination.totalPages}
               </span>
-              <Button variant="outline" size="sm" disabled={filters.page >= data.pagination.pages}
+              <Button variant="outline" size="sm" disabled={filters.page >= data.pagination.totalPages}
                 onClick={() => setFilters({ ...filters, page: filters.page + 1 })}>
                 Siguiente
               </Button>

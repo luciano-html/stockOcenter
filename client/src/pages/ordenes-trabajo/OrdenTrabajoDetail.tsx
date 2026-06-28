@@ -1,5 +1,6 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
 import type { WorkOrder, WorkOrderDetalle } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -46,8 +47,9 @@ const transitions: Record<string, { status: string; label: string; variant: 'def
 
 export default function OrdenTrabajoDetail() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [confirmStatus, setConfirmStatus] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery<{ data: WorkOrder }>({
@@ -114,7 +116,7 @@ export default function OrdenTrabajoDetail() {
             )}
           </div>
 
-          {actions.length > 0 && (
+          {isAdmin && actions.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-4 border-t">
               {actions.map((action) => (
                 <Button

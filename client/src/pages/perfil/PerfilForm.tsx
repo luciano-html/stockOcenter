@@ -21,7 +21,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function PerfilForm() {
-  const { user, login } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [success, setSuccess] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)

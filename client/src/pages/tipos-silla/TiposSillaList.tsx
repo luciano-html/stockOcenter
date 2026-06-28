@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { ChairTypeWithBOM } from '@/types'
+import type { ChairTypeWithBOM, Pagination } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,13 +13,14 @@ import { GoBack } from '@/components/shared/GoBack'
 
 export default function TiposSillaList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
 
-  const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM[] }>({
-    queryKey: ['tipos-silla'],
-    queryFn: () => api.get('/tipos-silla').then((r) => r.data),
+  const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM[]; pagination: Pagination }>({
+    queryKey: ['tipos-silla', page],
+    queryFn: () => api.get('/tipos-silla', { params: { page, limit: 50 } }).then((r) => r.data),
   })
 
   const deleteMutation = useMutation({
@@ -33,7 +34,7 @@ export default function TiposSillaList() {
     <div className="space-y-4">
       <GoBack />
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">{data?.data.length ?? 0} tipos</p>
+        <p className="text-sm text-muted-foreground">{data?.pagination.total ?? 0} tipos</p>
         {isAdmin && (
           <Link to="/tipos-silla/nuevo">
             <Button><Plus size={16} /> Nuevo tipo</Button>
@@ -76,11 +77,19 @@ export default function TiposSillaList() {
               </TableRow>
             ))}
             {data?.data.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin tipos de silla</TableCell></TableRow>
+              <TableRow><TableCell colSpan={isAdmin ? 5 : 4} className="text-center text-muted-foreground py-8">Sin tipos de silla</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {data?.pagination && data.pagination.totalPages > 1 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</Button>
+          <span className="text-sm text-muted-foreground py-2">Página {page} de {data.pagination.totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= data.pagination.totalPages} onClick={() => setPage(page + 1)}>Siguiente</Button>
+        </div>
+      )}
 
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogHeader><DialogTitle>¿Eliminar tipo de silla?</DialogTitle></DialogHeader>

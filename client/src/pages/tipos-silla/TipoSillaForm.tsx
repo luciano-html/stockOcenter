@@ -47,7 +47,7 @@ export default function TipoSillaForm() {
     queryFn: () => api.get('/componentes').then((r) => r.data),
   })
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     values: isEdit && tipoData ? { name: tipoData.data.name, description: tipoData.data.description ?? '' } : undefined,
   })

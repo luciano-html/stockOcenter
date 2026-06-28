@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/services/api'
-import type { User } from '@/types'
+import type { User, Pagination } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -29,11 +28,12 @@ export default function UsuariosList() {
   const [open, setOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [confirmCreate, setConfirmCreate] = useState(false)
+  const [page, setPage] = useState(1)
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery<{ data: User[] }>({
-    queryKey: ['usuarios'],
-    queryFn: () => api.get('/auth/usuarios').then((r) => r.data),
+  const { data, isLoading } = useQuery<{ data: User[]; pagination: Pagination }>({
+    queryKey: ['usuarios', page],
+    queryFn: () => api.get('/auth/usuarios', { params: { page, limit: 50 } }).then((r) => r.data),
   })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
@@ -62,7 +62,7 @@ export default function UsuariosList() {
     <div className="space-y-4">
       <GoBack />
       <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">{data?.data.length ?? 0} usuarios</p>
+        <p className="text-sm text-muted-foreground">{data?.pagination.total ?? 0} usuarios</p>
         <Button onClick={() => setOpen(true)}><Plus size={16} /> Nuevo usuario</Button>
       </div>
 
@@ -95,6 +95,14 @@ export default function UsuariosList() {
               )}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {data?.pagination && data.pagination.totalPages > 1 && (
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</Button>
+          <span className="text-sm text-muted-foreground py-2">Página {page} de {data.pagination.totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= data.pagination.totalPages} onClick={() => setPage(page + 1)}>Siguiente</Button>
         </div>
       )}
 

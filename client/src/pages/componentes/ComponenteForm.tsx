@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { GoBack } from '@/components/shared/GoBack'
 
-const schema = z.object({
+const schema: z.ZodType<FormData, any, any> = z.object({
   name: z.string().min(1, 'Requerido'),
   description: z.string().optional(),
   tipo: z.string().min(1, 'Requerido'),
@@ -24,7 +24,15 @@ const schema = z.object({
   stockMinimo: z.coerce.number().min(0, 'No puede ser negativo'),
 })
 
-type FormData = z.infer<typeof schema>
+type FormData = {
+  name: string
+  description?: string
+  tipo: string
+  subtipo?: string
+  marca?: string
+  unit: string
+  stockMinimo: number
+}
 
 export default function ComponenteForm() {
   const { id } = useParams()

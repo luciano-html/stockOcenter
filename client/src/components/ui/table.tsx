@@ -1,4 +1,4 @@
-import { forwardRef, type TableHTMLAttributes, type HTMLAttributes } from "react"
+import { forwardRef, type TableHTMLAttributes, type HTMLAttributes, type ThHTMLAttributes, type TdHTMLAttributes } from "react"
 import { cn } from "@/lib/utils"
 
 const Table = forwardRef<HTMLTableElement, TableHTMLAttributes<HTMLTableElement>>(
@@ -35,7 +35,7 @@ const TableRow = forwardRef<HTMLTableRowElement, HTMLAttributes<HTMLTableRowElem
 )
 TableRow.displayName = "TableRow"
 
-const TableHead = forwardRef<HTMLTableCellElement, HTMLAttributes<HTMLTableCellElement>>(
+const TableHead = forwardRef<HTMLTableCellElement, ThHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
     <th
       ref={ref}
@@ -46,7 +46,7 @@ const TableHead = forwardRef<HTMLTableCellElement, HTMLAttributes<HTMLTableCellE
 )
 TableHead.displayName = "TableHead"
 
-const TableCell = forwardRef<HTMLTableCellElement, HTMLAttributes<HTMLTableCellElement>>(
+const TableCell = forwardRef<HTMLTableCellElement, TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
     <td ref={ref} className={cn("p-4 align-middle", className)} {...props} />
   )
