@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { Layout } from '@/components/layout/Layout'
-import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
+import { ProtectedRoute, AdminRoute } from '@/components/layout/ProtectedRoute'
 import { Skeleton } from '@/components/ui/skeleton'
 
 const Login = lazy(() => import('@/pages/Login'))
@@ -33,15 +33,15 @@ const router = createBrowserRouter([
       { index: true, element: <SuspenseWrapper><Dashboard /></SuspenseWrapper> },
       { path: 'ingreso-stock', element: <SuspenseWrapper><IngresoStock /></SuspenseWrapper> },
       { path: 'componentes', element: <SuspenseWrapper><ComponentesList /></SuspenseWrapper> },
-      { path: 'componentes/nuevo', element: <SuspenseWrapper><ComponenteForm /></SuspenseWrapper> },
+      { path: 'componentes/nuevo', element: <AdminRoute><SuspenseWrapper><ComponenteForm /></SuspenseWrapper></AdminRoute> },
       { path: 'componentes/:id', element: <SuspenseWrapper><ComponenteForm /></SuspenseWrapper> },
       { path: 'tipos-silla', element: <SuspenseWrapper><TiposSillaList /></SuspenseWrapper> },
-      { path: 'tipos-silla/nuevo', element: <SuspenseWrapper><TipoSillaForm /></SuspenseWrapper> },
+      { path: 'tipos-silla/nuevo', element: <AdminRoute><SuspenseWrapper><TipoSillaForm /></SuspenseWrapper></AdminRoute> },
       { path: 'tipos-silla/:id', element: <SuspenseWrapper><TipoSillaForm /></SuspenseWrapper> },
       { path: 'ordenes-trabajo', element: <SuspenseWrapper><OrdenesTrabajoList /></SuspenseWrapper> },
-      { path: 'ordenes-trabajo/nuevo', element: <SuspenseWrapper><OrdenTrabajoForm /></SuspenseWrapper> },
+      { path: 'ordenes-trabajo/nuevo', element: <ProtectedRoute><AdminRoute><SuspenseWrapper><OrdenTrabajoForm /></SuspenseWrapper></AdminRoute></ProtectedRoute> },
       { path: 'ordenes-trabajo/:id', element: <SuspenseWrapper><OrdenTrabajoDetail /></SuspenseWrapper> },
-      { path: 'usuarios', element: <SuspenseWrapper><UsuariosList /></SuspenseWrapper> },
+      { path: 'usuarios', element: <AdminRoute><SuspenseWrapper><UsuariosList /></SuspenseWrapper></AdminRoute> },
       { path: 'perfil', element: <SuspenseWrapper><PerfilForm /></SuspenseWrapper> },
     ],
   },

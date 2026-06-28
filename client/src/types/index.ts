@@ -58,7 +58,7 @@ export interface WorkOrderDetalle {
 
 export interface StockMovement {
   _id: string
-  componentId?: { _id: string; name: string; unit: string }
+  componentId?: { _id: string; name: string; unit: string; tipo?: string; subtipo?: string; marca?: string }
   type: 'ingreso' | 'egreso'
   quantity: number
   referenceType?: 'work-order'
@@ -79,6 +79,12 @@ export interface StockResumen {
   sillasPosibles: SillasPosibles[]
 }
 
+export interface ReservaItem {
+  componente: { _id: string; name: string }
+  cantidadReservada: number
+  ordenes: { id: string; silla: string; cantidad: number }[]
+}
+
 export interface User {
   id: string
   username: string
@@ -95,5 +101,9 @@ export interface Pagination {
   page: number
   limit: number
   total: number
-  pages: number
+  totalPages: number
+}
+
+export type AxiosErrorType = {
+  response?: { data?: { error?: { message?: string } } }
 }

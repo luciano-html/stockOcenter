@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +13,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -21,8 +20,7 @@ export default function Login() {
     setLoading(true)
     try {
       await login(username, password)
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
-      navigate(from, { replace: true })
+      navigate('/', { replace: true })
     } catch {
       setError('Usuario o contraseña incorrectos')
     } finally {
