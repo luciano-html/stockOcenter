@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
-import type { StockResumen, StockMovement, ChairType } from '@/types'
+import type { StockMovement, ChairType } from '@/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Search, ArrowRight, Eye } from 'lucide-react'
+import { Search, ArrowRight } from 'lucide-react'
+import StockMovementsTable from '@/components/movements/StockMovementsTable'
 
 interface BomItemDetail {
   componentId: { _id: string; name: string; unit: string; tipo: string; subtipo?: string; marca?: string }
@@ -27,11 +27,12 @@ interface BomDetalleData {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery<{ data: StockResumen }>({
+  const { isLoading } = useQuery({
     queryKey: ['stock-resumen'],
     queryFn: () => api.get('/stock/resumen').then((r) => r.data),
     refetchInterval: 30000,
@@ -56,35 +57,40 @@ export default function Dashboard() {
     enabled: !!selectedId,
   })
 
+  const tiposFiltrados = useMemo(
+    () => tiposData?.data.filter((t) => t.name.toLowerCase().includes(search.toLowerCase())) ?? [],
+    [tiposData, search]
+  )
+
   if (isLoading) return <Skeleton className="h-96" />
-
-  const resumen = data?.data
-
-  const tiposFiltrados = tiposData?.data.filter((t) =>
-    t.name.toLowerCase().includes(search.toLowerCase())
-  ) ?? []
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
-        <Link to="/tipos-silla/nuevo" className="block">
-          <Card className="cursor-pointer w-fit min-w-[180px]">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Crear silla</CardTitle></CardHeader>
-            <CardContent><p className="text-lg font-bold text-green-600">+ Nueva</p></CardContent>
-          </Card>
-        </Link>
-        <Link to="/componentes/nuevo" className="block">
-          <Card className="cursor-pointer w-fit min-w-[180px]">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Crear componente</CardTitle></CardHeader>
-            <CardContent><p className="text-lg font-bold text-blue-600">+ Nuevo</p></CardContent>
-          </Card>
-        </Link>
-        <Link to="/ordenes-trabajo/nuevo" className="block">
-          <Card className="cursor-pointer w-fit min-w-[180px]">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Nueva orden</CardTitle></CardHeader>
-            <CardContent><p className="text-lg font-bold text-amber-600">+ Nueva</p></CardContent>
-          </Card>
-        </Link>
+        {isAdmin && (
+          <Link to="/tipos-silla/nuevo" className="block">
+            <Card className="cursor-pointer w-fit min-w-[180px]">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Crear silla</CardTitle></CardHeader>
+              <CardContent><p className="text-lg font-bold text-green-600">+ Nueva</p></CardContent>
+            </Card>
+          </Link>
+        )}
+        {isAdmin && (
+          <Link to="/componentes/nuevo" className="block">
+            <Card className="cursor-pointer w-fit min-w-[180px]">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Crear componente</CardTitle></CardHeader>
+              <CardContent><p className="text-lg font-bold text-blue-600">+ Nuevo</p></CardContent>
+            </Card>
+          </Link>
+        )}
+        {isAdmin && (
+          <Link to="/ordenes-trabajo/nuevo" className="block">
+            <Card className="cursor-pointer w-fit min-w-[180px]">
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Nueva orden</CardTitle></CardHeader>
+              <CardContent><p className="text-lg font-bold text-amber-600">+ Nueva</p></CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -179,94 +185,13 @@ export default function Dashboard() {
             </Link>
           </CardHeader>
           <CardContent>
-            {!movData?.data.length ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin movimientos registrados</p>
-            ) : (
-              <div className="max-h-[320px] overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Elemento</TableHead>
-                      <TableHead>Cant.</TableHead>
-                      <TableHead className="whitespace-nowrap">Fecha</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {movData.data.map((m) => (
-                      <TableRow key={m._id}>
-                        <TableCell>
-                          <span className={m.type === 'ingreso' ? 'text-green-600 font-medium' : 'text-destructive font-medium'}>
-                            {m.type === 'ingreso' ? 'ING' : 'EGR'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {m.referenceType === 'work-order'
-                            ? <span>Silla {m.referenceId?.chairTypeId?.name ?? ''}</span>
-                            : m.componentId?.name ?? '—'
-                          }
-                        </TableCell>
-                        <TableCell className={m.type === 'ingreso' ? 'text-green-600 font-bold' : 'text-destructive font-bold'}>
-                          {m.type === 'ingreso' ? '+' : '-'}{m.quantity}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                          {new Date(m.createdAt).toLocaleString('es-AR', {
-                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          {m.referenceType === 'work-order' && m.referenceId && (
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/ordenes-trabajo/${m.referenceId._id ?? m.referenceId}`)}>
-                              <Eye size={16} />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <StockMovementsTable
+              movements={movData?.data ?? []}
+              compact
+            />
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader><CardTitle>Componentes con stock bajo</CardTitle></CardHeader>
-        <CardContent>
-          <div className="max-h-[320px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Componente</TableHead>
-                  <TableHead>Disponible</TableHead>
-                  <TableHead>Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {resumen?.componentes.filter((c) => c.stockBajo).length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Sin alertas</TableCell></TableRow>
-                )}
-                {resumen?.componentes.filter((c) => c.stockBajo).map((c) => (
-                  <TableRow key={c._id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className={c.stockDisponible === 0 ? 'text-destructive font-bold' : 'text-amber-600 font-bold'}>
-                      {c.stockDisponible === 0 ? 'Sin stock' : `${c.stockDisponible} ${c.unit}`}
-                    </TableCell>
-                    <TableCell>
-                      {c.stockDisponible === 0
-                        ? <Badge variant="destructive">Sin stock</Badge>
-                        : <Badge variant="outline" className="text-amber-600 border-amber-600">Stock bajo</Badge>
-                      }
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
