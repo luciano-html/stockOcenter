@@ -1,13 +1,14 @@
 import { z } from 'zod';
+import { objectIdSchema } from './common';
 
 const workOrderItemSchema = z.object({
-  componentId: z.string().length(24, 'ID de componente inválido'),
+  componentId: objectIdSchema,
   quantity: z.coerce.number().int().min(1, 'Mínimo 1'),
   type: z.enum(['adicional', 'repuesto']),
 });
 
 export const createWorkOrderSchema = z.object({
-  chairTypeId: z.string().length(24, 'ID de tipo de silla inválido').optional(),
+  chairTypeId: objectIdSchema.optional(),
   quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
   items: z.array(workOrderItemSchema).optional(),
 }).refine((data) => {
@@ -18,7 +19,7 @@ export const createWorkOrderSchema = z.object({
 }, { message: 'Debe seleccionar un tipo de silla o agregar al menos un repuesto' });
 
 export const workOrderParamsSchema = z.object({
-  id: z.string().length(24, 'ID inválido'),
+  id: objectIdSchema,
 });
 
 export const updateStatusSchema = z.object({
@@ -27,4 +28,6 @@ export const updateStatusSchema = z.object({
 
 export const listWorkOrdersQuerySchema = z.object({
   estado: z.enum(['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });

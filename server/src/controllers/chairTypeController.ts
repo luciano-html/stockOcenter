@@ -1,39 +1,44 @@
 import { Request, Response } from 'express';
 import { ChairType, BOMItem, Component } from '../models';
 import { ApiError } from '../utils/ApiError';
-import { calcularSillasPosibles, calcularSillasPosiblesConDetalle, sillasPosiblesPorTipo } from '../services/stockService';
+import { calcularSillasPosiblesConDetalle, sillasPosiblesPorTipo } from '../services/stockService';
+import { getPagination, getSkip } from '../utils/pagination';
+import { clearStockCache } from '../utils/cache';
 
-export async function list(_req: Request, res: Response) {
-  const [tipos, sillasPosiblesArr] = await Promise.all([
-    ChairType.find().sort({ name: 1 }),
+export async function list(req: Request, res: Response) {
+  const page = Number(req.query.page ?? 1);
+  const limit = Number(req.query.limit ?? 50);
+
+  const [tipos, sillasPosiblesArr, bomCounts, total] = await Promise.all([
+    ChairType.find().sort({ name: 1 }).skip(getSkip(page, limit)).limit(limit).lean(),
     sillasPosiblesPorTipo(),
+    BOMItem.aggregate([{ $group: { _id: '$chairTypeId', count: { $sum: 1 } } }]),
+    ChairType.countDocuments(),
   ]);
 
   const sillasMap = new Map(sillasPosiblesArr.map((s) => [s._id, s]));
-
-  const bomCounts = await BOMItem.aggregate([
-    { $group: { _id: '$chairTypeId', count: { $sum: 1 } } },
-  ]);
   const bomCountMap = new Map(bomCounts.map((c) => [c._id.toString(), c.count]));
 
   const data = tipos.map((t) => {
     const s = sillasMap.get(t._id.toString());
     return {
-      ...t.toJSON(),
+      ...t,
       bomCount: bomCountMap.get(t._id.toString()) ?? 0,
       sillasPosibles: s?.sillasPosibles ?? 0,
     };
   });
 
-  res.json({ data });
+  res.json({ data, pagination: getPagination(page, limit, total) });
 }
 
 export async function getById(req: Request, res: Response) {
-  const tipo = await ChairType.findById(req.params.id);
+  const tipo = await ChairType.findById(req.params.id).lean();
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
 
-  const bom = await BOMItem.find({ chairTypeId: tipo._id }).populate('componentId', 'name unit');
-  res.json({ data: { ...tipo.toJSON(), bom } });
+  const bom = await BOMItem.find({ chairTypeId: tipo._id })
+    .populate('componentId', 'name unit')
+    .lean();
+  res.json({ data: { ...tipo, bom } });
 }
 
 export async function create(req: Request, res: Response) {
@@ -53,7 +58,11 @@ export async function create(req: Request, res: Response) {
     await BOMItem.insertMany(bomItems);
   }
 
-  const bomCompleto = await BOMItem.find({ chairTypeId: tipo._id }).populate('componentId', 'name unit');
+  clearStockCache();
+
+  const bomCompleto = await BOMItem.find({ chairTypeId: tipo._id })
+    .populate('componentId', 'name unit')
+    .lean();
   res.status(201).json({ data: { ...tipo.toJSON(), bom: bomCompleto } });
 }
 
@@ -83,7 +92,11 @@ export async function update(req: Request, res: Response) {
     }
   }
 
-  const bomCompleto = await BOMItem.find({ chairTypeId: tipo._id }).populate('componentId', 'name unit');
+  clearStockCache();
+
+  const bomCompleto = await BOMItem.find({ chairTypeId: tipo._id })
+    .populate('componentId', 'name unit')
+    .lean();
   res.json({ data: { ...tipo.toJSON(), bom: bomCompleto } });
 }
 
@@ -92,11 +105,12 @@ export async function remove(req: Request, res: Response) {
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
 
   await BOMItem.deleteMany({ chairTypeId: tipo._id });
+  clearStockCache();
   res.json({ data: tipo });
 }
 
 export async function sillasPosibles(req: Request, res: Response) {
-  const tipo = await ChairType.findById(req.params.id);
+  const tipo = await ChairType.findById(req.params.id).lean();
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
 
   const detalle = await calcularSillasPosiblesConDetalle(tipo._id.toString());
@@ -110,11 +124,39 @@ export async function sillasPosibles(req: Request, res: Response) {
 }
 
 export async function bomDetalle(req: Request, res: Response) {
-  const tipo = await ChairType.findById(req.params.id);
+  const tipo = await ChairType.findById(req.params.id).lean();
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
 
-  const bom = await BOMItem.find({ chairTypeId: tipo._id }).populate('componentId', 'name unit tipo subtipo marca stockActual stockReservado stockMinimo');
-  if (!bom.length) {
+  const items = await BOMItem.aggregate([
+    { $match: { chairTypeId: tipo._id } },
+    {
+      $lookup: {
+        from: 'components',
+        localField: 'componentId',
+        foreignField: '_id',
+        as: 'componente',
+      },
+    },
+    { $unwind: '$componente' },
+    {
+      $project: {
+        componentId: {
+          _id: '$componente._id',
+          name: '$componente.name',
+          unit: '$componente.unit',
+          tipo: '$componente.tipo',
+          subtipo: '$componente.subtipo',
+          marca: '$componente.marca',
+        },
+        quantity: '$quantity',
+        stockActual: '$componente.stockActual',
+        stockReservado: '$componente.stockReservado',
+        stockDisponible: { $subtract: ['$componente.stockActual', '$componente.stockReservado'] },
+      },
+    },
+  ]);
+
+  if (!items.length) {
     res.json({ data: { chairType: { _id: tipo._id, name: tipo.name }, sillasPosibles: 0, items: [] } });
     return;
   }
@@ -122,27 +164,18 @@ export async function bomDetalle(req: Request, res: Response) {
   let minSillas = Infinity;
   let limitante: { componentId: string; name: string; stockDisponible: number; necesario: number } | null = null;
 
-  const items = bom.map((item) => {
-    const comp = item.componentId as unknown as { _id: string; name: string; unit: string; tipo: string; subtipo?: string; marca?: string; stockActual: number; stockReservado: number; stockMinimo: number };
-    const disponible = comp.stockActual - comp.stockReservado;
-    const posibles = Math.floor(disponible / item.quantity);
+  for (const item of items) {
+    const posibles = Math.floor(item.stockDisponible / item.quantity);
     if (posibles < minSillas) {
       minSillas = posibles;
       limitante = {
-        componentId: comp._id.toString(),
-        name: comp.name,
-        stockDisponible: disponible,
+        componentId: item.componentId._id.toString(),
+        name: item.componentId.name,
+        stockDisponible: item.stockDisponible,
         necesario: item.quantity,
       };
     }
-    return {
-      componentId: { _id: comp._id, name: comp.name, unit: comp.unit, tipo: comp.tipo, subtipo: comp.subtipo, marca: comp.marca },
-      quantity: item.quantity,
-      stockActual: comp.stockActual,
-      stockReservado: comp.stockReservado,
-      stockDisponible: disponible,
-    };
-  });
+  }
 
   res.json({
     data: {

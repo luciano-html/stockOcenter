@@ -18,5 +18,6 @@ const bomItemSchema = new Schema<IBOMItem>(
 );
 
 bomItemSchema.index({ chairTypeId: 1, componentId: 1 }, { unique: true });
+bomItemSchema.index({ componentId: 1 });
 
 export const BOMItem = mongoose.model<IBOMItem>('BOMItem', bomItemSchema);

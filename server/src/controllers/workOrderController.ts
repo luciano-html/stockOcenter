@@ -1,31 +1,46 @@
 import { Request, Response } from 'express';
-import { WorkOrder, BOMItem, Component } from '../models';
+import { WorkOrder, BOMItem } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { canTransition, reservarStock, descontarStock, liberarReserva } from '../services/workOrderService';
+import { getPagination, getSkip } from '../utils/pagination';
 
 export async function list(req: Request, res: Response) {
-  const filter: Record<string, unknown> = {};
-  if (req.query.estado) filter.status = req.query.estado;
+  const { estado, page, limit } = req.query as { estado?: string; page?: string; limit?: string };
+  const pageNum = Number(page ?? 1);
+  const limitNum = Number(limit ?? 50);
 
-  const ordenes = await WorkOrder.find(filter)
-    .populate('chairTypeId', 'name')
-    .sort({ createdAt: -1 });
-  res.json({ data: ordenes });
+  const filter: Record<string, unknown> = {};
+  if (estado) filter.status = estado;
+
+  const [ordenes, total] = await Promise.all([
+    WorkOrder.find(filter)
+      .populate('chairTypeId', 'name')
+      .sort({ createdAt: -1 })
+      .skip(getSkip(pageNum, limitNum))
+      .limit(limitNum)
+      .lean(),
+    WorkOrder.countDocuments(filter),
+  ]);
+
+  res.json({ data: ordenes, pagination: getPagination(pageNum, limitNum, total) });
 }
 
 export async function getById(req: Request, res: Response) {
-  const ot = await WorkOrder.findById(req.params.id).populate('chairTypeId', 'name');
+  const ot = await WorkOrder.findById(req.params.id).populate('chairTypeId', 'name').lean();
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
   res.json({ data: ot });
 }
 
 export async function getDetalle(req: Request, res: Response) {
-  const ot = await WorkOrder.findById(req.params.id).populate('chairTypeId', 'name');
+  const ot = await WorkOrder.findById(req.params.id).populate('chairTypeId', 'name').lean();
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
 
   const bom = ot.chairTypeId
-    ? (await BOMItem.find({ chairTypeId: ot.chairTypeId._id }).populate('componentId', 'name unit tipo subtipo marca'))
-      .map((item) => ({
+    ? (
+        await BOMItem.find({ chairTypeId: (ot.chairTypeId as unknown as { _id: string })._id })
+          .populate('componentId', 'name unit tipo subtipo marca')
+          .lean()
+      ).map((item) => ({
         componentId: item.componentId,
         quantity: item.quantity * ot.quantity,
         unit: (item.componentId as unknown as { unit: string })?.unit ?? '',
@@ -33,16 +48,12 @@ export async function getDetalle(req: Request, res: Response) {
       }))
     : [];
 
-  let extraItems: Record<string, unknown>[] = [];
-  if (ot.items && ot.items.length > 0) {
-    const populated = await WorkOrder.findById(ot._id).populate('items.componentId', 'name unit tipo subtipo marca');
-    extraItems = (populated?.items ?? []).map((i) => ({
-      componentId: i.componentId,
-      quantity: i.quantity,
-      unit: (i.componentId as unknown as { unit: string })?.unit ?? '',
-      tipo: i.type,
-    }));
-  }
+  const extraItems = (ot.items ?? []).map((i) => ({
+    componentId: i.componentId,
+    quantity: i.quantity,
+    unit: '',
+    tipo: i.type,
+  }));
 
   res.json({ data: { orden: ot, items: [...bom, ...extraItems] } });
 }
@@ -50,7 +61,7 @@ export async function getDetalle(req: Request, res: Response) {
 export async function create(req: Request, res: Response) {
   const { chairTypeId, quantity, items } = req.body;
   const ot = await WorkOrder.create({ chairTypeId, quantity, items: items ?? [] });
-  const populated = await ot.populate('chairTypeId', 'name');
+  const populated = await WorkOrder.findById(ot._id).populate('chairTypeId', 'name').lean();
   res.status(201).json({ data: populated });
 }
 
@@ -83,6 +94,6 @@ export async function updateStatus(req: Request, res: Response) {
   ot.status = status;
   await ot.save();
 
-  const populated = await ot.populate('chairTypeId', 'name');
+  const populated = await WorkOrder.findById(ot._id).populate('chairTypeId', 'name').lean();
   res.json({ data: populated });
 }
