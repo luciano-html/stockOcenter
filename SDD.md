@@ -22,7 +22,7 @@ Ejemplo de stack definido:
 | Base de datos | MongoDB + Mongoose | Documental, flexible para BOMs |
 | Frontend | React + Vite + TypeScript | Ecosistema maduro, velocidad |
 | Validación | Zod | Tipos inferidos, compartible front/back |
-| Estado servidor | TanStack Query | Cache, refetch, mutaciones |
+| Estado servidor | TanStack Query | Cache, refetch, mutaciones |o
 | Formularios | react-hook-form | Performante, integración con Zod |
 
 Se crean **skills/templates** que la IA (opencode, Claude, etc.) carga automáticamente para seguir exactamente esas convenciones.
@@ -92,6 +92,11 @@ Cuando el equipo decide cambiar algo (ej. migrar de `express-validator` a `zod`)
 | 04 | Frontend: páginas y layout responsive | `docs/sdd/04-ui-wireframes.md` |
 | 05 | Autenticación y roles | `docs/sdd/05-autenticacion-roles.md` |
 | 06 | UI Library (shadcn/ui) | `docs/sdd/06-ui-library.md` |
+| 07 | Fases de desarrollo | `docs/sdd/07-fases-desarrollo.md` |
+| 08 | Post-desarrollo: tipos/marcas | `docs/sdd/08-post-desarrollo-tipos-marcas.md` |
+| 09 | Paleta oficial colores y fonts | `docs/sdd/09-paleta-oficial-colores.md` |
+| 10 | Auditoría técnica: rendimiento, seguridad y mejoras | `docs/sdd/10-auditoria-rendimiento-seguridad.md` |
+| 11 | Correctivos de rendimiento y seguridad | `docs/sdd/11-correctivos-rendimiento-seguridad.md` |
 
 ---
 
