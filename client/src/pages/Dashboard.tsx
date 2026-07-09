@@ -123,7 +123,7 @@ export default function Dashboard() {
   }, [ordenesData])
 
   const kpis = [
-    { label: 'Stock bajo', value: stockBajoCount, icon: AlertTriangle, href: '/componentes', color: 'text-destructive', bg: 'bg-red-50' },
+    { label: 'Stock bajo', value: stockBajoCount, icon: AlertTriangle, href: '/componentes?stockBajo=true', color: 'text-destructive', bg: 'bg-red-50' },
     { label: 'Órdenes activas', value: ordenesActivas, icon: ClipboardList, href: '/ordenes-trabajo', color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Ingresos hoy', value: ingresosHoyTotal, icon: TrendingUp, href: '/ingreso-stock', color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Sillas posibles', value: sillasPosiblesTotal, icon: Armchair, href: '/tipos-silla', color: 'text-amber-600', bg: 'bg-amber-50' },

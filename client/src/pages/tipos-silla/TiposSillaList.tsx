@@ -4,12 +4,13 @@ import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
 import type { ChairTypeWithBOM, ComponenteFiltros, Pagination } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { GoBack } from '@/components/shared/GoBack'
 
@@ -23,6 +24,7 @@ export default function TiposSillaList() {
   const sort = params.get('sort') ?? 'posibles'
   const order = params.get('order') ?? 'desc'
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
@@ -70,6 +72,16 @@ export default function TiposSillaList() {
     setParams(next, { replace: true })
   }
 
+  function toggleExpand(id: string) {
+    const next = new Set(expandedIds)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    setExpandedIds(next)
+  }
+
   function toggleSort(field: 'nombre' | 'posibles' | 'activo') {
     const next = new URLSearchParams(params)
     if (sort === field) {
@@ -85,6 +97,75 @@ export default function TiposSillaList() {
   function SortIcon({ field }: { field: 'nombre' | 'posibles' | 'activo' }) {
     if (sort !== field) return <ArrowUpDown size={14} className="text-muted-foreground" />
     return order === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+  }
+
+  function getPosiblesBadgeVariant(value: number): 'destructive' | 'warning' | 'success' {
+    if (value === 0) return 'destructive'
+    if (value < 15) return 'warning'
+    return 'success'
+  }
+
+  function ExpandedRow({ chairTypeId }: { chairTypeId: string }) {
+    const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM }>({
+      queryKey: ['tipo-silla-bom', chairTypeId],
+      queryFn: () => api.get(`/tipos-silla/${chairTypeId}`).then((r) => r.data),
+      enabled: !!chairTypeId,
+    })
+
+    const bom = data?.data.bom ?? []
+
+    return (
+      <TableRow className="bg-muted/30 hover:bg-muted/30">
+        <TableCell colSpan={6} className="p-0">
+          <div className="p-4">
+            {isLoading ? (
+              <Skeleton className="h-24" />
+            ) : bom.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Este tipo de silla no tiene componentes asignados
+              </p>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Componente</TableHead>
+                      <TableHead>Cantidad por silla</TableHead>
+                      {isAdmin && <TableHead className="w-16">Acciones</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bom.map((item) => {
+                      const comp = typeof item.componentId === 'string' ? null : item.componentId
+                      const componentId = typeof item.componentId === 'string' ? item.componentId : item.componentId._id
+                      return (
+                        <TableRow key={item._id}>
+                          <TableCell className="font-medium">
+                            {comp ? comp.name : 'Componente no encontrado'}
+                          </TableCell>
+                          <TableCell>{item.quantity} {comp?.unit ?? ''}</TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Link to={`/componentes/${componentId}`}>
+                                  <Button variant="ghost" size="icon" aria-label="Editar componente">
+                                    <Pencil size={16} />
+                                  </Button>
+                                </Link>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    )
   }
 
   if (isLoading) return <Skeleton className="h-64" />
@@ -135,6 +216,7 @@ export default function TiposSillaList() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10"></TableHead>
               <TableHead>
                 <button
                   type="button"
@@ -168,33 +250,54 @@ export default function TiposSillaList() {
           </TableHeader>
           <TableBody>
             {data?.data.map((t) => (
-              <TableRow key={t._id}>
-                <TableCell className="font-medium">{t.name}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{t.bomCount ?? 0} componentes</TableCell>
-                <TableCell className="font-bold">{t.sillasPosibles ?? 0}</TableCell>
-                <TableCell>{t.active ? 'Sí' : 'No'}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Link to={`/tipos-silla/${t._id}`}>
-                      <Button variant="ghost" size="icon" aria-label="Ver detalle"><Eye size={16} /></Button>
-                    </Link>
-                    {isAdmin && (
-                      <>
-                        <Link to={`/tipos-silla/${t._id}/editar`}>
-                          <Button variant="ghost" size="icon" aria-label="Editar"><Pencil size={16} /></Button>
-                        </Link>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(t._id)} aria-label="Eliminar">
-                          <Trash2 size={16} className="text-destructive" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
+              <>
+                <TableRow
+                  key={t._id}
+                  className="cursor-pointer"
+                  onClick={() => toggleExpand(t._id)}
+                >
+                  <TableCell className="w-10">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleExpand(t._id) }}
+                      className="p-1 hover:bg-muted rounded"
+                      aria-label={expandedIds.has(t._id) ? 'Colapsar' : 'Expandir'}
+                    >
+                      {expandedIds.has(t._id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                  </TableCell>
+                  <TableCell className="font-medium">{t.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{t.bomCount ?? 0} componentes</TableCell>
+                  <TableCell>
+                    <Badge variant={getPosiblesBadgeVariant(t.sillasPosibles ?? 0)}>
+                      {t.sillasPosibles ?? 0}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{t.active ? 'Sí' : 'No'}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Link to={`/tipos-silla/${t._id}`}>
+                        <Button variant="ghost" size="icon" aria-label="Ver detalle"><Eye size={16} /></Button>
+                      </Link>
+                      {isAdmin && (
+                        <>
+                          <Link to={`/tipos-silla/${t._id}/editar`}>
+                            <Button variant="ghost" size="icon" aria-label="Editar"><Pencil size={16} /></Button>
+                          </Link>
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteId(t._id)} aria-label="Eliminar">
+                            <Trash2 size={16} className="text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {expandedIds.has(t._id) && <ExpandedRow key={`${t._id}-bom`} chairTypeId={t._id} />}
+              </>
             ))}
             {data?.data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">Sin tipos de silla</TableCell>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin tipos de silla</TableCell>
               </TableRow>
             )}
           </TableBody>

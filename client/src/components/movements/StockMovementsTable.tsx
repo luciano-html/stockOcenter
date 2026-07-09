@@ -107,11 +107,11 @@ export default function StockMovementsTable({
               <TableRow key={m._id}>
                 <TableCell>
                   {compact ? (
-                    <span className={m.type === 'ingreso' ? 'text-green-600 font-medium' : 'text-destructive font-medium'}>
-                      {m.type === 'ingreso' ? 'ING' : 'EGR'}
-                    </span>
+                    <Badge variant={m.type === 'ingreso' ? 'success' : 'destructive'}>
+                      {m.type === 'ingreso' ? '+' : '−'}
+                    </Badge>
                   ) : (
-                    <Badge variant={m.type === 'ingreso' ? 'secondary' : 'destructive'}>
+                    <Badge variant={m.type === 'ingreso' ? 'success' : 'destructive'}>
                       {m.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
                     </Badge>
                   )}

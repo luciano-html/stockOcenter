@@ -20,6 +20,7 @@ export default function ComponentesList() {
   const tipoFiltro = params.get('tipo') ?? ''
   const subtipoFiltro = params.get('subtipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
+  const stockBajoFiltro = params.get('stockBajo') === 'true'
   const page = Number(params.get('page') ?? '1')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showReserved, setShowReserved] = useState(false)
@@ -28,13 +29,14 @@ export default function ComponentesList() {
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: Componente[]; pagination: Pagination }>({
-    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, marcaFiltro, page],
+    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, marcaFiltro, stockBajoFiltro, page],
     queryFn: () => api.get('/componentes', {
       params: {
         search: search || undefined,
         tipo: tipoFiltro || undefined,
         subtipo: subtipoFiltro || undefined,
         marca: marcaFiltro || undefined,
+        stockBajo: stockBajoFiltro || undefined,
         page,
         limit: 50,
       },
@@ -58,6 +60,23 @@ export default function ComponentesList() {
   })
 
   const reservas = reservasData?.data ?? []
+
+  function toggleStockBajo() {
+    const next = new URLSearchParams(params)
+    if (stockBajoFiltro) {
+      next.delete('stockBajo')
+    } else {
+      next.set('stockBajo', 'true')
+    }
+    next.delete('page')
+    setParams(next, { replace: true })
+  }
+
+  function getDisponibleBadgeVariant(value: number, minimo: number): 'destructive' | 'warning' | 'success' {
+    if (value <= minimo) return 'destructive'
+    if (value <= minimo * 2) return 'warning'
+    return 'success'
+  }
 
   return (
     <div className="space-y-4">
@@ -96,6 +115,14 @@ export default function ComponentesList() {
             <option value="">Todas las marcas</option>
             {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
+          <Button
+            type="button"
+            variant={stockBajoFiltro ? 'destructive' : 'outline'}
+            size="sm"
+            onClick={toggleStockBajo}
+          >
+            Stock bajo
+          </Button>
         </div>
         {reservas.length > 0 && (
           <Button variant="outline" onClick={() => setShowReserved(true)}>
@@ -135,7 +162,11 @@ export default function ComponentesList() {
                   <TableCell className="text-sm text-muted-foreground">{c.marca || '—'}</TableCell>
                   <TableCell>{c.unit}</TableCell>
                   <TableCell className={c.stockReservado > 0 ? 'text-amber-600 font-bold' : ''}>{c.stockReservado}</TableCell>
-                  <TableCell className="font-bold">{c.stockDisponible}</TableCell>
+                  <TableCell>
+                    <Badge variant={getDisponibleBadgeVariant(c.stockDisponible, c.stockMinimo)}>
+                      {c.stockDisponible}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{c.stockMinimo}</TableCell>
                   <TableCell>
                     {c.stockDisponible <= c.stockMinimo
