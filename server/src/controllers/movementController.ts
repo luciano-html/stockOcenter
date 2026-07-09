@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
-import { StockMovement, BOMItem } from '../models';
+import { StockMovement } from '../models';
 import { getPagination, getSkip } from '../utils/pagination';
 
 export async function list(req: Request, res: Response) {
@@ -11,25 +10,7 @@ export async function list(req: Request, res: Response) {
   const filter: Record<string, unknown> = {};
 
   if (componenteId) {
-    const bomItems = await BOMItem.find({ componentId: componenteId }).select('chairTypeId').lean();
-    const chairTypeIds = [...new Set(bomItems.map((b) => b.chairTypeId.toString()))];
-
-    const [bomWorkOrders, itemsWorkOrders] = await Promise.all([
-      mongoose.model('WorkOrder').find({ chairTypeId: { $in: chairTypeIds } }).select('_id').lean(),
-      mongoose.model('WorkOrder').find({ 'items.componentId': componenteId }).select('_id').lean(),
-    ]);
-
-    const workOrderIds = [
-      ...new Set([
-        ...bomWorkOrders.map((wo) => wo._id),
-        ...itemsWorkOrders.map((wo) => wo._id),
-      ]),
-    ];
-
-    filter.$or = [
-      { componentId: componenteId },
-      { referenceType: 'work-order', referenceId: { $in: workOrderIds } },
-    ];
+    filter.componentId = componenteId;
   }
 
   if (tipo) filter.type = tipo;
@@ -43,6 +24,8 @@ export async function list(req: Request, res: Response) {
   const total = await StockMovement.countDocuments(filter);
   const movimientos = await StockMovement.find(filter)
     .populate('componentId', 'name unit tipo subtipo marca')
+    .populate('userId', 'name role')
+    .populate({ path: 'referenceId', select: 'chairTypeId quantity', populate: { path: 'chairTypeId', select: 'name' } })
     .sort({ createdAt: -1 })
     .skip(getSkip(pageNum, limitNum))
     .limit(limitNum)

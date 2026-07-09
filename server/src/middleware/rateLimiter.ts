@@ -1,28 +1,6 @@
-import rateLimit from 'express-rate-limit';
+// Rate limiting deshabilitado temporalmente.
+// Para producción: usar express-rate-limit con store Redis para persistencia
+// y reinicio independiente del proceso. Ver docs/sdd/11-correctivos-rendimiento-seguridad.md.
 
-export const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    error: {
-      status: 429,
-      message: 'Demasiadas peticiones. Intentá más tarde.',
-    },
-  },
-});
-
-export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true,
-  message: {
-    error: {
-      status: 429,
-      message: 'Demasiados intentos de login. Intentá más tarde.',
-    },
-  },
-});
+export const globalLimiter = (_req: unknown, _res: unknown, next: () => void) => next();
+export const authLimiter = (_req: unknown, _res: unknown, next: () => void) => next();

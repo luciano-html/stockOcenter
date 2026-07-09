@@ -1,14 +1,19 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 let isRefreshing = false
-let refreshSubscribers: Array<(token?: string) => void> = []
+let refreshSubscribers: Array<{ resolve: () => void; reject: () => void }> = []
 
-function subscribeTokenRefresh(callback: (token?: string) => void) {
-  refreshSubscribers.push(callback)
+function subscribeTokenRefresh(subscriber: { resolve: () => void; reject: () => void }) {
+  refreshSubscribers.push(subscriber)
 }
 
-function onTokenRefreshed(token?: string) {
-  refreshSubscribers.forEach((callback) => callback(token))
+function onTokenRefreshed() {
+  refreshSubscribers.forEach((subscriber) => subscriber.resolve())
+  refreshSubscribers = []
+}
+
+function onRefreshFailed() {
+  refreshSubscribers.forEach((subscriber) => subscriber.reject())
   refreshSubscribers = []
 }
 
@@ -24,9 +29,10 @@ api.interceptors.response.use(
 
     if (err.response?.status === 401 && originalRequest && !originalRequest._retry) {
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh(() => {
-            resolve(api(originalRequest))
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh({
+            resolve: () => resolve(api(originalRequest)),
+            reject: () => reject(err),
           })
         })
       }
@@ -39,8 +45,12 @@ api.interceptors.response.use(
         onTokenRefreshed()
         return api(originalRequest)
       } catch {
-        onTokenRefreshed()
-        window.location.href = '/login'
+        onRefreshFailed()
+        const isAuthCheck = originalRequest.url?.includes('/auth/me')
+        const alreadyOnLogin = window.location.pathname === '/login'
+        if (!isAuthCheck && !alreadyOnLogin) {
+          window.location.href = '/login'
+        }
         return Promise.reject(err)
       } finally {
         isRefreshing = false

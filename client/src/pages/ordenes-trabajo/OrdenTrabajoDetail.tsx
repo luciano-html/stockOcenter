@@ -1,17 +1,18 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
-import type { WorkOrder, WorkOrderDetalle } from '@/types'
+import type { WorkOrder, WorkOrderDetalle, AxiosErrorType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useState } from 'react'
-import { Play, Pause, CheckCircle, XCircle } from 'lucide-react'
+import { Play, Pause, CheckCircle, XCircle, Pencil, AlertTriangle } from 'lucide-react'
 import { GoBack } from '@/components/shared/GoBack'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import FinalizarOrdenModal from './FinalizarOrdenModal'
 
 const statusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
@@ -45,12 +46,30 @@ const transitions: Record<string, { status: string; label: string; variant: 'def
   ],
 }
 
+function AuditInfo({ ot }: { ot: WorkOrder }) {
+  return (
+    <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
+      {ot.createdBy && (
+        <p>Creada por: <span className="font-medium text-foreground">{ot.createdBy.name} ({ot.createdBy.role})</span> · {new Date(ot.createdAt).toLocaleString()}</p>
+      )}
+      {ot.startedBy && ot.startedAt && (
+        <p>Iniciada por: <span className="font-medium text-foreground">{ot.startedBy.name} ({ot.startedBy.role})</span> · {new Date(ot.startedAt).toLocaleString()}</p>
+      )}
+      {ot.finalizedBy && ot.finalizedAt && (
+        <p>Finalizada por: <span className="font-medium text-foreground">{ot.finalizedBy.name} ({ot.finalizedBy.role})</span> · {new Date(ot.finalizedAt).toLocaleString()}</p>
+      )}
+    </div>
+  )
+}
+
 export default function OrdenTrabajoDetail() {
   const { id } = useParams()
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [confirmStatus, setConfirmStatus] = useState<string | null>(null)
+  const [showFinalize, setShowFinalize] = useState(false)
+  const [stockError, setStockError] = useState<{ componentId: string; name: string; necesario: number; disponible: number }[] | null>(null)
 
   const { data, isLoading } = useQuery<{ data: WorkOrder }>({
     queryKey: ['orden-trabajo', id],
@@ -70,8 +89,16 @@ export default function OrdenTrabajoDetail() {
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
       queryClient.invalidateQueries({ queryKey: ['stock-resumen'] })
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo-dash'] })
-      queryClient.invalidateQueries({ queryKey: ['movimientos-recent-dash'] })
+      queryClient.invalidateQueries({ queryKey: ['movimientos-recent'] })
       setConfirmStatus(null)
+      setStockError(null)
+    },
+    onError: (err: AxiosErrorType) => {
+      setConfirmStatus(null)
+      const details = err?.response?.data?.error?.details as { faltantes?: { componentId: string; name: string; necesario: number; disponible: number }[] } | undefined
+      if (details?.faltantes && details.faltantes.length > 0) {
+        setStockError(details.faltantes)
+      }
     },
   })
 
@@ -80,6 +107,8 @@ export default function OrdenTrabajoDetail() {
 
   const ot = data.data
   const actions = transitions[ot.status] ?? []
+  const canFinalize = ['pendiente', 'en_progreso', 'pausada'].includes(ot.status)
+  const canEdit = isAdmin && ot.status === 'pendiente'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -93,6 +122,11 @@ export default function OrdenTrabajoDetail() {
               <Badge variant="outline" className={statusClass[ot.status]}>{statusLabels[ot.status]}</Badge>
             </CardTitle>
           </div>
+          {canEdit && (
+            <Link to={`/ordenes-trabajo/${ot._id}/editar`}>
+              <Button variant="outline" size="sm"><Pencil size={16} className="mr-1" /> Editar</Button>
+            </Link>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -116,6 +150,15 @@ export default function OrdenTrabajoDetail() {
             )}
           </div>
 
+          {isAdmin && <AuditInfo ot={ot} />}
+
+          {ot.operatorNotes && (
+            <div className="text-sm bg-amber-50 text-amber-900 p-3 rounded-md border border-amber-200">
+              <p className="font-medium">Notas del operario:</p>
+              <p>{ot.operatorNotes}</p>
+            </div>
+          )}
+
           {isAdmin && actions.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-4 border-t">
               {actions.map((action) => (
@@ -127,6 +170,14 @@ export default function OrdenTrabajoDetail() {
                   <action.icon size={16} /> {action.label}
                 </Button>
               ))}
+            </div>
+          )}
+
+          {!isAdmin && canFinalize && (
+            <div className="flex flex-wrap gap-2 pt-4 border-t">
+              <Button onClick={() => setShowFinalize(true)}>
+                <CheckCircle size={16} /> Finalizar orden
+              </Button>
             </div>
           )}
         </CardContent>
@@ -194,6 +245,54 @@ export default function OrdenTrabajoDetail() {
           </Button>
         </div>
       </Dialog>
+
+      <Dialog open={!!stockError} onOpenChange={() => setStockError(null)}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle size={18} /> No hay stock suficiente
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-3">
+          No se puede iniciar la orden porque faltan los siguientes componentes:
+        </p>
+        <div className="rounded-md border overflow-x-auto mb-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Componente</TableHead>
+                <TableHead>Necesario</TableHead>
+                <TableHead>Disponible</TableHead>
+                <TableHead>Faltante</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stockError?.map((item) => (
+                <TableRow key={item.componentId}>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>{item.necesario}</TableCell>
+                  <TableCell className="text-destructive font-bold">{item.disponible}</TableCell>
+                  <TableCell>{Math.max(0, item.necesario - item.disponible)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setStockError(null)}>Volver</Button>
+          <Link to="/ingreso-stock">
+            <Button onClick={() => setStockError(null)}>Ir a cargar stock</Button>
+          </Link>
+        </div>
+      </Dialog>
+
+      {detalleData?.data.items && (
+        <FinalizarOrdenModal
+          orderId={ot._id}
+          items={detalleData.data.items}
+          isOpen={showFinalize}
+          onClose={() => setShowFinalize(false)}
+        />
+      )}
     </div>
   )
 }

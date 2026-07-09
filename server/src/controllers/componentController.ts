@@ -106,8 +106,13 @@ export async function list(req: Request, res: Response) {
     .limit(limitNum)
     .lean();
 
+  const data = componentes.map((c) => ({
+    ...c,
+    stockDisponible: c.stockActual - c.stockReservado,
+  }));
+
   res.json({
-    data: componentes,
+    data,
     pagination: getPagination(pageNum, limitNum, total),
   });
 }
@@ -115,7 +120,7 @@ export async function list(req: Request, res: Response) {
 export async function getById(req: Request, res: Response) {
   const componente = await Component.findById(req.params.id).lean();
   if (!componente) throw ApiError.notFound('Componente no encontrado');
-  res.json({ data: componente });
+  res.json({ data: { ...componente, stockDisponible: componente.stockActual - componente.stockReservado } });
 }
 
 export async function create(req: Request, res: Response) {

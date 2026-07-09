@@ -7,6 +7,19 @@ export const ingresoStockSchema = z.object({
   notas: z.string().trim().optional(),
 });
 
+export const ingresoMasivoSchema = z.object({
+  notasGenerales: z.string().trim().optional(),
+  items: z
+    .array(
+      z.object({
+        componenteId: objectIdSchema,
+        cantidad: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
+        notas: z.string().trim().optional(),
+      })
+    )
+    .min(1, 'Debe enviar al menos un ítem'),
+});
+
 export const egresoStockSchema = z.object({
   componenteId: objectIdSchema,
   cantidad: z.number().int().min(1, 'La cantidad debe ser al menos 1'),

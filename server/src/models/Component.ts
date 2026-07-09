@@ -21,7 +21,7 @@ const componentSchema = new Schema<IComponent>(
     tipo: { type: String, required: true, trim: true, index: true },
     subtipo: { type: String, trim: true, index: true },
     marca: { type: String, trim: true, index: true },
-    unit: { type: String, required: true, trim: true },
+    unit: { type: String, required: true, trim: true, default: 'unidad' },
     stockActual: { type: Number, required: true, default: 0, min: 0 },
     stockReservado: { type: Number, required: true, default: 0, min: 0 },
     stockMinimo: { type: Number, required: true, default: 0, min: 0 },

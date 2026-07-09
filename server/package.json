@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:3001": "PORT=3001 tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "start:3001": "PORT=3001 node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -39,10 +39,10 @@ Fecha de decisión: 2026-06-28.
 **Pregunta:** ¿Qué límites aplicar?
 
 **Decisión:**
-- Global: 100 requests cada 15 minutos por IP.
-- Login: 5 intentos cada 15 minutos por IP.
+- Deshabilitado temporalmente (2026-06-28). El rate limiter con store en memoria generaba bloqueos inesperados (se reseteaba al reiniciar el servidor y contaba requests de endpoints que no debía). Se eliminó `globalLimiter` y `authLimiter`.
+- Para producción: implementar `express-rate-limit` con store Redis (persistencia) y aplicarlo solo a endpoints críticos (login, creación de usuarios).
 
-**Justificación:** Protege contra fuerza bruta sin afectar el uso normal de la app.
+**Justificación:** El rate limiting con memoria no es confiable en este contexto. Se prefiere funcionalidad sin bloqueos falsos; se documenta como pendiente para producción.
 
 ---
 

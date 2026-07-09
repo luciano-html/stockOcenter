@@ -31,7 +31,7 @@ export interface ChairType {
 export interface BOMItem {
   _id: string
   chairTypeId: string
-  componentId: { _id: string; name: string; unit: string }
+  componentId: { _id: string; name: string; unit: string } | string
   quantity: number
 }
 
@@ -46,6 +46,13 @@ export interface WorkOrder {
   chairTypeId?: { _id: string; name: string }
   quantity: number
   status: 'pendiente' | 'en_progreso' | 'pausada' | 'finalizada' | 'cancelada'
+  items?: { componentId: string; quantity: number; type: 'adicional' | 'repuesto' }[]
+  createdBy?: { _id: string; name: string; role: string }
+  updatedBy?: { _id: string; name: string; role: string }
+  startedBy?: { _id: string; name: string; role: string }
+  startedAt?: string
+  finalizedBy?: { _id: string; name: string; role: string }
+  operatorNotes?: string
   createdAt: string
   updatedAt: string
   finalizedAt?: string
@@ -64,6 +71,8 @@ export interface StockMovement {
   referenceType?: 'work-order'
   referenceId?: { _id: string; chairTypeId?: { name: string }; quantity: number }
   notes?: string
+  userId?: { _id: string; name: string; role: string }
+  userRole?: 'admin' | 'operario'
   createdAt: string
 }
 
@@ -105,5 +114,13 @@ export interface Pagination {
 }
 
 export type AxiosErrorType = {
-  response?: { data?: { error?: { message?: string } } }
+  response?: {
+    data?: {
+      error?: {
+        message?: string
+        errors?: Array<{ index: number; message: string }>
+        details?: unknown
+      }
+    }
+  }
 }

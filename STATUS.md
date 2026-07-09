@@ -84,6 +84,17 @@
 - **Infra**: Eliminado `server/src/seed-db.ts`; configurado Vitest + Supertest con tests iniciales.
 - **SDD**: Actualizado `STATUS.md` con TODO de auditoría y `.opencode/rules/project-status.md` con reglas de auditoría.
 
+### 2026-07-05: Bug fixes — BOM, filtros, ingreso de stock, movimientos, órdenes y dashboard
+- **BOM**: Validación de componentes existentes en create/update de tipos de silla; endpoint admin `POST /api/tipos-silla/limpiar-huerfanos`.
+- **BOM**: Editor de tipos de silla usa `Autocomplete`, marca componentes huérfanos y permite limpiarlos.
+- **Tipos de silla**: Filtros por nombre, tipo, sub-tipo y marca de componentes del BOM (backend + frontend).
+- **Stock**: Eliminado ingreso unitario; solo queda ingreso masivo renombrado a "Cargar stock".
+- **Movimientos**: Reparada búsqueda sin filtros y sincronización de filtros en `MovimientosList`.
+- **Órdenes**: Diálogo de inicio ya no se bloquea; si falta stock se muestra modal con componentes faltantes y cantidades.
+- **Órdenes**: Agregados `startedBy`/`startedAt`; auditoría muestra creador, iniciador y finalizador.
+- **Dashboard**: Rediseño opción A con KPIs clickeables y kanban de órdenes por estado.
+- **Builds**: `npm run build` pasa en server y client; `npm test` pasa en server.
+
 ### 2026-06-28: Decisiones SDD #11 — Correctivos de rendimiento y seguridad
 - **SDD**: Creado doc #11 con decisiones de diseño para aplicar correcciones.
 - **Decisiones tomadas**:
@@ -120,62 +131,26 @@
 
 ## Última sesión
 
-> Se están aplicando los correctivos derivados de la auditoría SDD #10, documentados en SDD #11.
+> Bugs corregidos y dashboard rediseñado. El sistema está corriendo en dev.
 
-**Sesión:** 2026-06-28
+**Sesión:** 2026-07-05
 **Cambios principales:**
-- Auditoría completa de backend y frontend (SDD #10).
-- Creado SDD #11 con decisiones de diseño para los correctivos.
-- Actualizado `SDD.md`, `STATUS.md` y `.opencode/rules/project-status.md`.
+- BOM de tipos de silla: validación backend, limpieza de huérfanos, Autocomplete en editor y manejo de componentes faltantes.
+- Filtros de componentes (tipo/subtipo/marca/búsqueda) en listado de tipos de silla.
+- Eliminado ingreso unitario; ingreso masivo renombrado a "Cargar stock".
+- Reparado historial de movimientos: filtros sincronizados y búsqueda sin filtros funciona.
+- Órdenes de trabajo: diálogo de inicio maneja errores; si falta stock se muestra modal con faltantes.
+- Auditoría de OT: agregados `startedBy`/`startedAt`; detalle muestra creador, iniciador y finalizador.
+- Dashboard rediseñado con KPIs clickeables y kanban de órdenes.
+- Actualizado `STATUS.md`.
 
-**TODO auditoría/correctivos — 2026-06-28**
-
-- [x] Documentar decisiones SDD #11.
-- [x] Backend — seguridad y autenticación:
-  - [x] CORS con variable de entorno `CORS_ORIGINS`.
-  - [x] Agregar `helmet`.
-  - [x] Rate limiting global + estricto en login.
-  - [x] Validar `JWT_SECRET` y `REFRESH_TOKEN_SECRET` al inicio.
-  - [x] Cookies `httpOnly` para access/refresh tokens.
-  - [x] Endpoints `/auth/refresh`, `/auth/logout`, `/auth/me`.
-  - [x] Verificar usuario activo en cada request autenticado.
-  - [x] Validación de ObjectId con `mongoose.Types.ObjectId.isValid`.
-- [x] Backend — stock atómico y transacciones (standalone):
-  - [x] Egreso atómico con `findOneAndUpdate` + `$inc`.
-  - [x] Compensación manual en `descontarStock` por falta de transacciones MongoDB.
-- [x] Backend — rendimiento:
-  - [x] Agregar `.lean()` en lecturas de solo lectura.
-  - [x] Paginación `page/limit` en `/componentes`, `/tipos-silla`, `/ordenes-trabajo`, `/stock/movimientos`.
-  - [x] Reescribir cálculo de sillas posibles como agregación única.
-  - [x] Agregar `node-cache` para resúmenes y cálculos frecuentes.
-  - [x] Índices faltantes en `WorkOrder` y `BOMItem`.
-  - [x] Escapar regex en búsqueda de componentes.
-- [x] Frontend — build y seguridad:
-  - [x] Corregir `baseUrl` deprecado en `tsconfig.app.json`.
-  - [x] `api.ts` con `withCredentials` e interceptor de refresh token.
-  - [x] `AuthContext` con cookies, `useMemo` y `useCallback`.
-  - [x] `lang="es"` en `index.html`.
-- [x] Frontend — rendimiento y UX:
-  - [x] Componente `Autocomplete` para selects grandes.
-  - [x] Reemplazar selects nativos en `IngresoStock` y `OrdenTrabajoForm`.
-  - [x] Memoizar `tiposFiltrados` en `Dashboard`.
-  - [x] Dialog accesible manual con focus trap y Escape.
-  - [x] Corregir `colSpan` en `TiposSillaList`.
-  - [x] Refactorizar `OrdenTrabajoForm` a `react-hook-form + zod`.
-  - [x] Corregir imports no usados y tipados rotos en varios archivos.
-  - [x] Anidar `AdminRoute` dentro de `ProtectedRoute` en `router.tsx`.
-- [x] Frontend — manejo de paginación en listados (`ComponentesList`, `OrdenesTrabajoList`, `TiposSillaList`, `UsuariosList`).
-- [x] Backend — validadores Zod aplicados en todos los endpoints con inputs.
-- [x] Backend/Frontend — eliminar `server/src/seed-db.ts`.
-- [x] Tests — instalar y configurar Vitest + Supertest; agregar tests iniciales.
-- [x] Verificación final de builds (`npm run build` pasa en server y client; `npm test` pasa en server).
+**Verificación:**
+- [x] `npm run build` pasa en server.
+- [x] `npm run build` pasa en client.
+- [x] `npm test` pasa en server.
+- [x] Runtime probado: login, filtros de tipos de silla, limpieza de huérfanos, inicio de OT con falta de stock.
 
 **Notas para continuar:**
-- El backend y el frontend compilan correctamente.
-- Tests básicos de backend pasan (404 en /api/* y SPA).
-- Falta probar el runtime con MongoDB corriendo (login, ingreso/egreso, crear OT, cambiar estado, dashboard).
-
-**Notas para continuar:**
-- El backend y el frontend compilan correctamente (`npm run build` en ambos).
-- Falta probar el runtime y terminar la paginación en los listados del frontend.
-- La autenticación ahora usa cookies; el frontend debe probarse con el servidor corriendo.
+- Servidor corriendo en http://localhost:3000.
+- Cliente corriendo en http://localhost:5173.
+- Los cambios de modelo (`startedBy`/`startedAt`) ya están aplicados en MongoDB (campos opcionales).

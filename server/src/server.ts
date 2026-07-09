@@ -29,8 +29,20 @@ function validateEnv() {
 async function main() {
   validateEnv();
   await connectDB();
-  app.listen(PORT, '0.0.0.0', () => {
+
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\nEl puerto ${PORT} ya está en uso.`);
+      console.error(`   Probá con otro puerto:`);
+      console.error(`   PORT=3001 npm run dev    (o editá server/.env)`);
+      process.exit(1);
+    }
+    console.error('Error del servidor:', err);
+    process.exit(1);
   });
 }
 

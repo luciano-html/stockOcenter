@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/services/api'
-import type { ChairType, Componente, AxiosErrorType } from '@/types'
+import type { ChairTypeWithBOM, Componente, AxiosErrorType, WorkOrder } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -53,8 +53,10 @@ type FormData = {
 }
 
 export default function OrdenTrabajoForm() {
+  const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const isEditing = !!id
   const [showConfirm, setShowConfirm] = useState(false)
 
   const {
@@ -63,6 +65,7 @@ export default function OrdenTrabajoForm() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -78,15 +81,62 @@ export default function OrdenTrabajoForm() {
   const chairTypeId = watch('chairTypeId')
   const quantity = watch('quantity')
 
-  const { data: tiposData, isLoading } = useQuery<{ data: ChairType[] }>({
+  const { data: tiposData, isLoading: loadingTipos } = useQuery<{ data: ChairTypeWithBOM[] }>({
     queryKey: ['tipos-silla-select'],
-    queryFn: () => api.get('/tipos-silla').then((r) => r.data),
+    queryFn: () => api.get('/tipos-silla', { params: { limit: 100 } }).then((r) => r.data),
   })
 
   const { data: compData } = useQuery<Componente[]>({
     queryKey: ['componentes', 'ot-form'],
     queryFn: () => api.get('/componentes', { params: { limit: 1000 } }).then((r) => r.data.data),
   })
+
+  const { data: orderData, isLoading: loadingOrder } = useQuery<{ data: WorkOrder }>({
+    queryKey: ['orden-trabajo', id],
+    queryFn: () => api.get(`/ordenes-trabajo/${id}`).then((r) => r.data),
+    enabled: isEditing,
+  })
+
+  const componentMap = useMemo(() => {
+    const map = new Map<string, Componente>()
+    compData?.forEach((c) => map.set(c._id, c))
+    return map
+  }, [compData])
+
+  useEffect(() => {
+    if (isEditing && orderData?.data && compData) {
+      const ot = orderData.data
+      const items = ot.items ?? []
+      const adicionales = items
+        .filter((i) => i.type === 'adicional')
+        .map((i) => {
+          const comp = componentMap.get(i.componentId as unknown as string)
+          return {
+            componentId: i.componentId as unknown as string,
+            componentName: comp?.name ?? '',
+            quantity: i.quantity,
+          }
+        })
+      const repuestos = items
+        .filter((i) => i.type === 'repuesto')
+        .map((i) => {
+          const comp = componentMap.get(i.componentId as unknown as string)
+          return {
+            componentId: i.componentId as unknown as string,
+            componentName: comp?.name ?? '',
+            quantity: i.quantity,
+          }
+        })
+
+      reset({
+        tipoOrden: ot.chairTypeId ? 'silla' : 'repuestos',
+        chairTypeId: ot.chairTypeId?._id,
+        quantity: ot.quantity,
+        adicionales,
+        repuestos,
+      })
+    }
+  }, [isEditing, orderData, compData, componentMap, reset])
 
   const {
     fields: adicFields,
@@ -109,49 +159,65 @@ export default function OrdenTrabajoForm() {
     [compData]
   )
 
-  const tipoSillaOptions = useMemo(
-    () =>
-      (tiposData?.data ?? [])
-        .filter((t) => t.active)
-        .map((t) => ({ value: t._id, label: t.name })),
-    [tiposData]
-  )
+  const tipoSillaOptions = useMemo(() => {
+    const activos = (tiposData?.data ?? [])
+      .filter((t) => t.active)
+      .sort((a, b) => {
+        const aPosibles = a.sillasPosibles ?? 0
+        const bPosibles = b.sillasPosibles ?? 0
+        if (aPosibles > 0 && bPosibles === 0) return -1
+        if (aPosibles === 0 && bPosibles > 0) return 1
+        if (aPosibles > 0 && bPosibles > 0) return bPosibles - aPosibles
+        return a.name.localeCompare(b.name)
+      })
+    return activos.map((t) => ({
+      value: t._id,
+      label: `${t.name} (${t.sillasPosibles ?? 0} posibles)`,
+    }))
+  }, [tiposData])
 
   const selectedChairName = useMemo(
     () => tipoSillaOptions.find((t) => t.value === chairTypeId)?.label ?? '',
     [tipoSillaOptions, chairTypeId]
   )
 
+  const buildPayload = (form: FormData) => ({
+    ...(form.tipoOrden === 'silla' && form.chairTypeId ? { chairTypeId: form.chairTypeId } : {}),
+    quantity: form.quantity,
+    items: [
+      ...form.adicionales.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'adicional' as const })),
+      ...form.repuestos.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'repuesto' as const })),
+    ],
+  })
+
   const mutation = useMutation({
-    mutationFn: (form: FormData) =>
-      api.post('/ordenes-trabajo', {
-        ...(form.tipoOrden === 'silla' && form.chairTypeId ? { chairTypeId: form.chairTypeId } : {}),
-        quantity: form.quantity,
-        items: [
-          ...form.adicionales.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'adicional' as const })),
-          ...form.repuestos.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'repuesto' as const })),
-        ],
-      }),
+    mutationFn: (form: FormData) => {
+      const payload = buildPayload(form)
+      return isEditing
+        ? api.patch(`/ordenes-trabajo/${id}`, payload)
+        : api.post('/ordenes-trabajo', payload)
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
       queryClient.invalidateQueries({ queryKey: ['stock-resumen'] })
       queryClient.invalidateQueries({ queryKey: ['componentes'] })
+      queryClient.invalidateQueries({ queryKey: ['orden-trabajo', id] })
       navigate(`/ordenes-trabajo/${res.data.data._id}`)
     },
     onError: (err: AxiosErrorType) => {
-      alert(err?.response?.data?.error?.message ?? 'Error al crear la orden')
+      alert(err?.response?.data?.error?.message ?? `Error al ${isEditing ? 'guardar' : 'crear'} la orden`)
     },
   })
 
   const onSubmit = handleSubmit(() => setShowConfirm(true))
 
-  if (isLoading) return <Skeleton className="h-64" />
+  if (loadingTipos || (isEditing && loadingOrder)) return <Skeleton className="h-64" />
 
   return (
     <div className="space-y-4">
       <GoBack />
       <Card className="max-w-2xl mx-auto">
-        <CardHeader><CardTitle>Nueva orden de trabajo</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{isEditing ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'}</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -221,7 +287,7 @@ export default function OrdenTrabajoForm() {
             <div className="flex gap-2 justify-end pt-2">
               <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Creando...' : 'Crear orden'}
+                {mutation.isPending ? 'Guardando...' : (isEditing ? 'Guardar cambios' : 'Crear orden')}
               </Button>
             </div>
           </form>
@@ -230,12 +296,12 @@ export default function OrdenTrabajoForm() {
 
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogHeader>
-          <DialogTitle>¿Crear orden de trabajo?</DialogTitle>
+          <DialogTitle>{isEditing ? '¿Guardar cambios?' : '¿Crear orden de trabajo?'}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground mb-4">
           {tipoOrden === 'silla'
-            ? `Se creará una orden por ${quantity} silla${(Number(quantity) !== 1 ? 's' : '')} ${selectedChairName}.`
-            : 'Se creará una orden de solo repuestos.'}
+            ? `Orden por ${quantity} silla${(Number(quantity) !== 1 ? 's' : '')} ${selectedChairName}.`
+            : 'Orden de solo repuestos.'}
           {adicFields.length > 0 && ` Incluye ${adicFields.length} adicional(es).`}
           {repFields.length > 0 && ` Incluye ${repFields.length} repuesto(s).`}
         </p>

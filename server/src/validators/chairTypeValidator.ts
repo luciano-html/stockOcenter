@@ -26,4 +26,10 @@ export const chairTypeParamsSchema = z.object({
 export const listChairTypesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  q: z.string().trim().optional(),
+  tipo: z.string().trim().optional(),
+  subtipo: z.string().trim().optional(),
+  marca: z.string().trim().optional(),
+  sort: z.enum(['nombre', 'posibles', 'activo']).optional(),
+  order: z.enum(['asc', 'desc']).optional(),
 });

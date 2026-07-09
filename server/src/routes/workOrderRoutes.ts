@@ -4,6 +4,8 @@ import { validate } from '../middleware/validate';
 import { authenticate, authorize } from '../middleware/auth';
 import {
   createWorkOrderSchema,
+  updateWorkOrderSchema,
+  finalizeWorkOrderSchema,
   updateStatusSchema,
   workOrderParamsSchema,
   listWorkOrdersQuerySchema,
@@ -17,6 +19,20 @@ router.get('/', validate(listWorkOrdersQuerySchema, 'query'), workOrderControlle
 router.get('/:id', validate(workOrderParamsSchema, 'params'), workOrderController.getById);
 router.get('/:id/detalle', validate(workOrderParamsSchema, 'params'), workOrderController.getDetalle);
 router.post('/', authorize('admin'), validate(createWorkOrderSchema), workOrderController.create);
+router.patch(
+  '/:id',
+  authorize('admin'),
+  validate(workOrderParamsSchema, 'params'),
+  validate(updateWorkOrderSchema),
+  workOrderController.update
+);
+router.post(
+  '/:id/finalizar',
+  authorize('admin', 'operario'),
+  validate(workOrderParamsSchema, 'params'),
+  validate(finalizeWorkOrderSchema),
+  workOrderController.finalizar
+);
 router.patch(
   '/:id/estado',
   authorize('admin'),

@@ -68,7 +68,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg mx-4 outline-none"
+        className="relative z-50 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg mx-4 outline-none"
       >
         <DialogTitleContext.Provider value={titleId}>
           {children}

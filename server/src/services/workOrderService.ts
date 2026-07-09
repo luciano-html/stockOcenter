@@ -33,6 +33,29 @@ export async function reservarStock(chairTypeId: string | undefined, quantity: n
   const compList = await getItems(chairTypeId, quantity, items);
   if (!compList.length) throw ApiError.badRequest('La orden no tiene componentes definidos');
 
+  // Verificar disponibilidad de todos los componentes antes de reservar
+  const componentIds = compList.map((item) => item.componentId);
+  const componentes = await Component.find({ _id: { $in: componentIds } }).lean();
+  const componentMap = new Map(componentes.map((c) => [c._id.toString(), c]));
+
+  const faltantes: { componentId: string; name: string; necesario: number; disponible: number }[] = [];
+  for (const item of compList) {
+    const comp = componentMap.get(item.componentId);
+    const disponible = (comp?.stockActual ?? 0) - (comp?.stockReservado ?? 0);
+    if (!comp || disponible < item.quantity) {
+      faltantes.push({
+        componentId: item.componentId,
+        name: comp?.name ?? 'Desconocido',
+        necesario: item.quantity,
+        disponible: Math.max(0, disponible),
+      });
+    }
+  }
+
+  if (faltantes.length > 0) {
+    throw ApiError.badRequest('Stock insuficiente para iniciar la orden', { faltantes });
+  }
+
   const reservados: { componentId: string; quantity: number }[] = [];
 
   for (const item of compList) {
@@ -51,7 +74,15 @@ export async function reservarStock(chairTypeId: string | undefined, quantity: n
           $inc: { stockReservado: -r.quantity },
         });
       }
-      throw ApiError.badRequest(`Stock insuficiente para el componente (id: ${item.componentId})`);
+      const comp = componentMap.get(item.componentId);
+      throw ApiError.badRequest('Stock insuficiente para iniciar la orden', {
+        faltantes: [{
+          componentId: item.componentId,
+          name: comp?.name ?? 'Desconocido',
+          necesario: item.quantity,
+          disponible: Math.max(0, (comp?.stockActual ?? 0) - (comp?.stockReservado ?? 0)),
+        }],
+      });
     }
 
     reservados.push({ componentId: item.componentId, quantity: item.quantity });
@@ -64,7 +95,9 @@ export async function descontarStock(
   chairTypeId: string | undefined,
   quantity: number,
   workOrderId: string,
-  items?: IWorkOrderItem[]
+  items: IWorkOrderItem[] | undefined,
+  userId: string | undefined,
+  userRole: 'admin' | 'operario' | undefined
 ) {
   const compList = await getItems(chairTypeId, quantity, items);
   const chairType = chairTypeId ? await ChairType.findById(chairTypeId).lean() : null;
@@ -95,6 +128,8 @@ export async function descontarStock(
       referenceType: 'work-order',
       referenceId: workOrderId,
       notes: `${label} (OT #${workOrderId.slice(-6)})`,
+      userId,
+      userRole,
     });
   } else {
     await StockMovement.insertMany(
@@ -105,6 +140,8 @@ export async function descontarStock(
         referenceType: 'work-order' as const,
         referenceId: workOrderId,
         notes: `${label} — ${item.quantity} unidades (OT #${workOrderId.slice(-6)})`,
+        userId,
+        userRole,
       }))
     );
   }

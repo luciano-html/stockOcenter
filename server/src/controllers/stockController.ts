@@ -6,6 +6,8 @@ import { clearStockCache, getCache, setCache } from '../utils/cache';
 
 export async function ingreso(req: Request, res: Response) {
   const { componenteId, cantidad, notas } = req.body;
+  const userId = req.user?.userId;
+  const userRole = req.user?.role;
 
   const componente = await Component.findByIdAndUpdate(
     componenteId,
@@ -19,14 +21,75 @@ export async function ingreso(req: Request, res: Response) {
     type: 'ingreso',
     quantity: cantidad,
     notes: notas,
+    userId,
+    userRole,
   });
 
   clearStockCache();
   res.json({ data: componente });
 }
 
+export async function ingresoMasivo(req: Request, res: Response) {
+  const { items, notasGenerales } = req.body as {
+    items: Array<{ componenteId: string; cantidad: number; notas?: string }>;
+    notasGenerales?: string;
+  };
+
+  const componenteIds = items.map((item) => item.componenteId);
+  const componentes = await Component.find({ _id: { $in: componenteIds } }).lean();
+  const componenteMap = new Map(componentes.map((c) => [c._id.toString(), c]));
+
+  const errores: Array<{ index: number; message: string }> = [];
+
+  items.forEach((item, index) => {
+    if (!componenteMap.has(item.componenteId)) {
+      errores.push({ index, message: 'Componente no encontrado' });
+    }
+  });
+
+  if (errores.length > 0) {
+    res.status(400).json({
+      error: { message: 'Errores de validación en el lote', errors: errores },
+    });
+    return;
+  }
+
+  const bulkOps = items.map((item) => ({
+    updateOne: {
+      filter: { _id: item.componenteId },
+      update: { $inc: { stockActual: item.cantidad } },
+    },
+  }));
+
+  await Component.bulkWrite(bulkOps);
+
+  const movementNotes = items.map((item) => {
+    const partes = [notasGenerales, item.notas].filter(Boolean);
+    return partes.length > 0 ? partes.join(' | ') : undefined;
+  });
+
+  const userId = req.user?.userId;
+  const userRole = req.user?.role;
+
+  await StockMovement.insertMany(
+    items.map((item, index) => ({
+      componentId: item.componenteId,
+      type: 'ingreso',
+      quantity: item.cantidad,
+      notes: movementNotes[index],
+      userId,
+      userRole,
+    }))
+  );
+
+  clearStockCache();
+  res.json({ data: { processed: items.length } });
+}
+
 export async function egreso(req: Request, res: Response) {
   const { componenteId, cantidad, notas } = req.body;
+  const userId = req.user?.userId;
+  const userRole = req.user?.role;
 
   const componente = await Component.findOneAndUpdate(
     {
@@ -46,6 +109,8 @@ export async function egreso(req: Request, res: Response) {
     type: 'egreso',
     quantity: cantidad,
     notes: notas,
+    userId,
+    userRole,
   });
 
   clearStockCache();

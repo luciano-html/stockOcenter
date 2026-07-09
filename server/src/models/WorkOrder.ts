@@ -13,6 +13,12 @@ export interface IWorkOrder extends Document {
   quantity: number;
   status: WorkOrderStatus;
   items?: IWorkOrderItem[];
+  createdBy?: Types.ObjectId;
+  updatedBy?: Types.ObjectId;
+  startedBy?: Types.ObjectId;
+  startedAt?: Date;
+  finalizedBy?: Types.ObjectId;
+  operatorNotes?: string;
   createdAt: Date;
   updatedAt: Date;
   finalizedAt?: Date;
@@ -39,6 +45,12 @@ const workOrderSchema = new Schema<IWorkOrder>(
       default: 'pendiente',
       index: true,
     },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    updatedBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    startedBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    startedAt: { type: Date },
+    finalizedBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    operatorNotes: { type: String, trim: true },
     finalizedAt: { type: Date },
   },
   { timestamps: true }

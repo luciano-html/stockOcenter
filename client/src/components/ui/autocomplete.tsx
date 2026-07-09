@@ -167,7 +167,7 @@ export function Autocomplete({
       {showList && (
         <ul
           id={`${inputId}-listbox`}
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-background py-1 shadow-lg"
+          className="absolute z-[9999] mt-1 max-h-60 w-full overflow-auto rounded-md border bg-background py-1 shadow-lg"
           role="listbox"
         >
           {filteredOptions.map((option, index) => (
@@ -191,7 +191,7 @@ export function Autocomplete({
         </ul>
       )}
       {showNoResults && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-background py-2 px-3 text-sm text-muted-foreground shadow-lg">
+        <div className="absolute z-[9999] mt-1 w-full rounded-md border bg-background py-2 px-3 text-sm text-muted-foreground shadow-lg">
           Sin resultados
         </div>
       )}

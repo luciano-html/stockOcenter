@@ -9,6 +9,8 @@ export interface IStockMovement extends Document {
   referenceType?: 'work-order';
   referenceId?: Types.ObjectId;
   notes?: string;
+  userId?: Types.ObjectId;
+  userRole?: 'admin' | 'operario';
   createdAt: Date;
 }
 
@@ -20,6 +22,8 @@ const stockMovementSchema = new Schema<IStockMovement>(
     referenceType: { type: String, enum: ['work-order'] },
     referenceId: { type: Schema.Types.ObjectId },
     notes: { type: String, trim: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    userRole: { type: String, enum: ['admin', 'operario'] },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

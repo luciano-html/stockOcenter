@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, ArmchairIcon, ClipboardList, LogOut, X, Truck, Users, User,
 } from 'lucide-react'
 
-const links = [
+const adminLinks = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/ingreso-stock', label: 'Ingreso de stock', icon: Truck },
   { to: '/componentes', label: 'Componentes', icon: Package },
@@ -13,9 +13,17 @@ const links = [
   { to: '/ordenes-trabajo', label: 'Órdenes de trabajo', icon: ClipboardList },
 ]
 
+const operarioLinks = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/stock', label: 'Stock', icon: Package },
+  { to: '/tipos-silla', label: 'Tipos de silla', icon: ArmchairIcon },
+  { to: '/ordenes-trabajo', label: 'Órdenes de trabajo', icon: ClipboardList },
+]
+
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const links = isAdmin ? adminLinks : operarioLinks
 
   return (
     <>

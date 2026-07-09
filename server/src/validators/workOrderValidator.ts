@@ -22,6 +22,22 @@ export const workOrderParamsSchema = z.object({
   id: objectIdSchema,
 });
 
+export const updateWorkOrderSchema = z.object({
+  chairTypeId: objectIdSchema.optional(),
+  quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
+  items: z.array(workOrderItemSchema).optional(),
+}).refine((data) => {
+  if (!data.chairTypeId && (!data.items || data.items.length === 0)) {
+    return false;
+  }
+  return true;
+}, { message: 'Debe seleccionar un tipo de silla o agregar al menos un repuesto' });
+
+export const finalizeWorkOrderSchema = z.object({
+  cantidades: z.array(z.coerce.number().int().min(0)),
+  notas: z.string().optional(),
+});
+
 export const updateStatusSchema = z.object({
   status: z.enum(['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada']),
 });

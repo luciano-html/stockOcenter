@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -9,12 +9,12 @@ import type { ChairTypeWithBOM, Componente } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select } from '@/components/ui/select'
+import { Autocomplete } from '@/components/ui/autocomplete'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { GoBack } from '@/components/shared/GoBack'
 
 const schema = z.object({
@@ -42,9 +42,31 @@ export default function TipoSillaForm() {
     enabled: isEdit,
   })
 
-  const { data: compData } = useQuery<{ data: Componente[] }>({
+  const { data: compData } = useQuery<{ data: Componente[]; pagination: { total: number } }>({
     queryKey: ['componentes-select'],
-    queryFn: () => api.get('/componentes').then((r) => r.data),
+    queryFn: () => api.get('/componentes', { params: { limit: 1000 } }).then((r) => r.data),
+  })
+
+  const componentOptions = useMemo(
+    () =>
+      (compData?.data ?? []).map((c) => ({
+        value: c._id,
+        label: `${c.name} (${c.unit})`,
+      })),
+    [compData]
+  )
+
+  const orphanCount = useMemo(
+    () => bom.filter((b) => !compData?.data.find((c) => c._id === b.componentId)).length,
+    [bom, compData]
+  )
+
+  const cleanupMutation = useMutation({
+    mutationFn: () => api.post('/tipos-silla/limpiar-huerfanos').then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tipo-silla', id] })
+      queryClient.invalidateQueries({ queryKey: ['tipos-silla'] })
+    },
   })
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -54,7 +76,12 @@ export default function TipoSillaForm() {
 
   useEffect(() => {
     if (isEdit && tipoData?.data.bom) {
-      setBom(tipoData.data.bom.map((b) => ({ componentId: b.componentId._id, quantity: b.quantity })))
+      setBom(
+        tipoData.data.bom.map((b) => ({
+          componentId: typeof b.componentId === 'string' ? b.componentId : b.componentId._id,
+          quantity: b.quantity,
+        }))
+      )
     }
   }, [isEdit, tipoData])
 
@@ -72,9 +99,9 @@ export default function TipoSillaForm() {
   const mutation = useMutation({
     mutationFn: (form: FormData) =>
       isEdit ? api.put(`/tipos-silla/${id}`, { ...form, bom }) : api.post('/tipos-silla', { ...form, bom }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['tipos-silla'] })
-      navigate('/tipos-silla')
+      navigate(`/tipos-silla/${res.data.data._id}`)
     },
   })
 
@@ -99,14 +126,31 @@ export default function TipoSillaForm() {
         </form>
 
         <div className="space-y-3">
-          <Label>Lista de materiales</Label>
+          <div className="flex items-center justify-between">
+            <Label>Lista de materiales</Label>
+            {orphanCount > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => cleanupMutation.mutate()}
+                disabled={cleanupMutation.isPending}
+                className="text-amber-600 border-amber-200 hover:bg-amber-50"
+              >
+                <AlertTriangle size={14} className="mr-1" />
+                {cleanupMutation.isPending ? 'Limpiando...' : `Limpiar ${orphanCount} huérfano(s)`}
+              </Button>
+            )}
+          </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Select value={selectedComponent} onChange={(e) => setSelectedComponent(e.target.value)}>
-              <option value="">Seleccionar componente...</option>
-              {compData?.data.map((c) => (
-                <option key={c._id} value={c._id}>{c.name} ({c.unit})</option>
-              ))}
-            </Select>
+            <div className="flex-1">
+              <Autocomplete
+                options={componentOptions}
+                value={selectedComponent}
+                onChange={setSelectedComponent}
+                placeholder="Buscar componente..."
+              />
+            </div>
             <Input type="number" min={1} className="w-24" value={selectedQty} onChange={(e) => setSelectedQty(Number(e.target.value))} />
             <Button type="button" variant="outline" onClick={addBOM} disabled={!selectedComponent}><Plus size={16} /> Agregar</Button>
           </div>
@@ -124,15 +168,21 @@ export default function TipoSillaForm() {
                 <TableBody>
                   {bom.map((b) => {
                     const comp = compData?.data.find((c) => c._id === b.componentId)
+                    const isOrphan = !comp
                     return (
-                      <TableRow key={b.componentId}>
-                        <TableCell>{comp?.name ?? b.componentId}</TableCell>
+                      <TableRow key={b.componentId} className={isOrphan ? 'bg-amber-50' : undefined}>
+                        <TableCell>
+                          {comp ? (
+                            <span className="font-medium">{comp.name}</span>
+                          ) : (
+                            <span className="text-amber-700 text-sm">
+                              Componente no encontrado <span className="font-mono text-xs">({b.componentId})</span>
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>{b.quantity}</TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => navigate(`/componentes/${b.componentId}`)}>
-                              <Pencil size={16} />
-                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => removeBOM(b.componentId)}>
                               <Trash2 size={16} className="text-destructive" />
                             </Button>

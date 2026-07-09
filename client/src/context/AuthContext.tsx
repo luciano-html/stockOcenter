@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useMemo, useCallback, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { User } from '@/types'
 import api from '@/services/api'
 
@@ -14,6 +15,7 @@ export const AuthContext = createContext<AuthContextType | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     api
@@ -29,10 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    await queryClient.cancelQueries()
+    queryClient.clear()
     await api.post('/auth/logout')
     setUser(null)
     window.location.href = '/login'
-  }, [])
+  }, [queryClient])
 
   const value = useMemo(
     () => ({ user, login, logout, loading }),
