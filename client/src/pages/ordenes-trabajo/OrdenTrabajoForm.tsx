@@ -203,7 +203,7 @@ export default function OrdenTrabajoForm() {
       map.set(componentId, current)
     }
 
-    if (tipoOrden === 'silla' && selectedChair) {
+    if (tipoOrden === 'silla' && selectedChair?.bom) {
       selectedChair.bom.forEach((bomItem) => {
         const compId = typeof bomItem.componentId === 'string' ? bomItem.componentId : bomItem.componentId._id
         addReq(compId, (Number(quantity) || 0) * bomItem.quantity)
