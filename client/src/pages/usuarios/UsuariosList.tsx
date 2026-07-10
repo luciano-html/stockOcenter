@@ -10,11 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Trash2, Search, Shield, User as UserIcon } from 'lucide-react'
+import { Plus, Trash2, Search, Shield, User as UserIcon, Users, ScrollText } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { GoBack } from '@/components/shared/GoBack'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { cn } from '@/lib/utils'
+import AuditLogs from './AuditLogs'
 
 const schema = z.object({
   username: z.string().min(3, 'Mínimo 3 caracteres'),
@@ -31,6 +33,7 @@ export default function UsuariosList() {
   const [confirmCreate, setConfirmCreate] = useState(false)
   const [page, setPage] = useState(1)
   const [busqueda, setBusqueda] = useState('')
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'logs'>('usuarios')
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery<{ data: User[]; pagination: Pagination }>({
@@ -71,60 +74,93 @@ export default function UsuariosList() {
       <GoBack />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
-        <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setOpen(true)}>
-          <Plus size={16} className="mr-1" /> Nuevo usuario
-        </Button>
+        {activeTab === 'usuarios' && (
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setOpen(true)}>
+            <Plus size={16} className="mr-1" /> Nuevo usuario
+          </Button>
+        )}
       </div>
 
-      <div className="relative w-full sm:w-64">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" size={16} />
-        <Input
-          placeholder="Buscar usuario..."
-          className="pl-9"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-        />
-      </div>
-
-      {isLoading ? <Skeleton className="h-64" /> : (
-        <div className="rounded-md border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Usuario</TableHead>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Rol</TableHead>
-                <TableHead className="w-16 text-right"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {usuariosFiltrados.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.username}</TableCell>
-                  <TableCell>{u.name}</TableCell>
-                  <TableCell>
-                    {u.role === 'admin'
-                      ? <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50"><Shield size={12} className="mr-1" /> Admin</Badge>
-                      : <Badge variant="outline" className="text-gray-700 border-gray-300 bg-gray-100"><UserIcon size={12} className="mr-1" /> Operario</Badge>}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(u.id)}>
-                        <Trash2 size={16} className="text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {usuariosFiltrados.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  {busqueda ? 'No hay usuarios que coincidan' : 'Sin usuarios'}
-                </TableCell></TableRow>
+      <div className="flex border-b">
+        {[
+          { key: 'usuarios', label: 'Usuarios', icon: Users },
+          { key: 'logs', label: 'Logs de actividad', icon: ScrollText },
+        ].map((tab) => {
+          const isActive = activeTab === tab.key
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key as 'usuarios' | 'logs')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
-            </TableBody>
-          </Table>
-        </div>
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {activeTab === 'usuarios' && (
+        <>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" size={16} />
+            <Input
+              placeholder="Buscar usuario..."
+              className="pl-9"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+          </div>
+
+          {isLoading ? <Skeleton className="h-64" /> : (
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Usuario</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Rol</TableHead>
+                    <TableHead className="w-16 text-right"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {usuariosFiltrados.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.username}</TableCell>
+                      <TableCell>{u.name}</TableCell>
+                      <TableCell>
+                        {u.role === 'admin'
+                          ? <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50"><Shield size={12} className="mr-1" /> Admin</Badge>
+                          : <Badge variant="outline" className="text-gray-700 border-gray-300 bg-gray-100"><UserIcon size={12} className="mr-1" /> Operario</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end">
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteId(u.id)}>
+                            <Trash2 size={16} className="text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {usuariosFiltrados.length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      {busqueda ? 'No hay usuarios que coincidan' : 'Sin usuarios'}
+                    </TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
       )}
+
+      {activeTab === 'logs' && <AuditLogs />}
 
       {data?.pagination && data.pagination.totalPages > 1 && (
         <div className="flex justify-center gap-2">

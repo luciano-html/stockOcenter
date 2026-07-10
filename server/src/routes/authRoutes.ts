@@ -12,6 +12,7 @@ router.post('/refresh', authController.refresh);
 router.post('/logout', authenticate, authController.logout);
 router.get('/me', authenticate, authController.me);
 router.get('/usuarios', authenticate, authorize('admin'), authController.listUsers);
+router.get('/logs', authenticate, authorize('admin'), authController.listLogs);
 router.put('/perfil', authenticate, validate(updateProfileSchema), authController.updateProfile);
 router.delete('/usuarios/:id', authenticate, authorize('admin'), validate(userParamsSchema, 'params'), authController.deleteUser);
 

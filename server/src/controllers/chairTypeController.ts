@@ -5,6 +5,7 @@ import { calcularSillasPosiblesConDetalle, sillasPosiblesPorTipo } from '../serv
 import { getPagination, getSkip } from '../utils/pagination';
 import { clearStockCache } from '../utils/cache';
 import { escapeRegex } from '../utils/escapeRegex';
+import { createAuditLog } from '../services/auditService';
 
 export async function list(req: Request, res: Response) {
   const { q, tipo, subtipo, marca, page, limit, sort, order } = req.query as {
@@ -141,6 +142,17 @@ export async function create(req: Request, res: Response) {
   const bomCompleto = await BOMItem.find({ chairTypeId: tipo._id })
     .populate('componentId', 'name unit')
     .lean();
+
+  await createAuditLog({
+    action: 'chair_type_created',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Creación del tipo de silla "${tipo.name}"`,
+    metadata: { chairTypeId: tipo._id, name: tipo.name, bomCount: bom?.length ?? 0 },
+    req,
+  });
+
   res.status(201).json({ data: { ...tipo.toJSON(), bom: bomCompleto } });
 }
 
@@ -179,6 +191,17 @@ export async function update(req: Request, res: Response) {
   const bomCompleto = await BOMItem.find({ chairTypeId: tipo._id })
     .populate('componentId', 'name unit')
     .lean();
+
+  await createAuditLog({
+    action: 'chair_type_updated',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Actualización del tipo de silla "${tipo.name}"`,
+    metadata: { chairTypeId: tipo._id, name: tipo.name, bomCount: bom?.length ?? 0, changes: data },
+    req,
+  });
+
   res.json({ data: { ...tipo.toJSON(), bom: bomCompleto } });
 }
 
@@ -188,6 +211,17 @@ export async function remove(req: Request, res: Response) {
 
   await BOMItem.deleteMany({ chairTypeId: tipo._id });
   clearStockCache();
+
+  await createAuditLog({
+    action: 'chair_type_deleted',
+    severity: 'warning',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Eliminación del tipo de silla "${tipo.name}"`,
+    metadata: { chairTypeId: tipo._id, name: tipo.name },
+    req,
+  });
+
   res.json({ data: tipo });
 }
 

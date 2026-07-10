@@ -124,3 +124,37 @@ export type AxiosErrorType = {
     }
   }
 }
+
+export type AuditAction =
+  | 'login_success'
+  | 'login_failed'
+  | 'logout'
+  | 'user_created'
+  | 'user_deleted'
+  | 'profile_updated'
+  | 'stock_ingreso'
+  | 'stock_ingreso_masivo'
+  | 'stock_egreso'
+  | 'component_created'
+  | 'component_updated'
+  | 'component_deleted'
+  | 'chair_type_created'
+  | 'chair_type_updated'
+  | 'chair_type_deleted'
+  | 'work_order_created'
+  | 'work_order_updated'
+  | 'work_order_status_changed'
+  | 'work_order_finished'
+
+export interface AuditLog {
+  _id: string
+  action: AuditAction
+  severity: 'info' | 'warning' | 'error'
+  userId?: { _id: string; username: string; name: string; role: 'admin' | 'operario' }
+  username?: string
+  description: string
+  metadata: Record<string, unknown>
+  ip?: string
+  userAgent?: string
+  createdAt: string
+}

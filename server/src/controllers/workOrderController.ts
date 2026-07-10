@@ -3,6 +3,7 @@ import { WorkOrder, BOMItem } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { canTransition, reservarStock, descontarStock, liberarReserva } from '../services/workOrderService';
 import { getPagination, getSkip } from '../utils/pagination';
+import { createAuditLog } from '../services/auditService';
 
 const USER_POPULATE = {
   path: 'createdBy updatedBy startedBy finalizedBy',
@@ -82,6 +83,22 @@ export async function create(req: Request, res: Response) {
     .populate('chairTypeId', 'name')
     .populate(USER_POPULATE)
     .lean();
+
+  await createAuditLog({
+    action: 'work_order_created',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Creación de OT #${ot._id.toString().slice(-6)}`,
+    metadata: {
+      orderId: ot._id,
+      chairTypeId: chairTypeId,
+      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
+      quantity,
+    },
+    req,
+  });
+
   res.status(201).json({ data: populated });
 }
 
@@ -104,6 +121,22 @@ export async function update(req: Request, res: Response) {
     .populate('chairTypeId', 'name')
     .populate(USER_POPULATE)
     .lean();
+
+  await createAuditLog({
+    action: 'work_order_updated',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Edición de OT #${ot._id.toString().slice(-6)}`,
+    metadata: {
+      orderId: ot._id,
+      chairTypeId: chairTypeId ?? ot.chairTypeId,
+      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
+      quantity,
+    },
+    req,
+  });
+
   res.json({ data: populated });
 }
 
@@ -179,6 +212,22 @@ export async function finalizar(req: Request, res: Response) {
     .populate('chairTypeId', 'name')
     .populate(USER_POPULATE)
     .lean();
+
+  await createAuditLog({
+    action: 'work_order_finished',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Finalización de OT #${ot._id.toString().slice(-6)}`,
+    metadata: {
+      orderId: ot._id,
+      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
+      quantity: ot.quantity,
+      notas,
+    },
+    req,
+  });
+
   res.json({ data: populated });
 }
 
@@ -220,6 +269,8 @@ export async function updateStatus(req: Request, res: Response) {
       break;
   }
 
+  const previousStatus = ot.status;
+
   ot.status = status;
   ot.updatedBy = req.user?.userId as any;
   await ot.save();
@@ -228,5 +279,21 @@ export async function updateStatus(req: Request, res: Response) {
     .populate('chairTypeId', 'name')
     .populate(USER_POPULATE)
     .lean();
+
+  await createAuditLog({
+    action: 'work_order_status_changed',
+    severity: status === 'cancelada' ? 'warning' : 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Cambio de estado en OT #${ot._id.toString().slice(-6)}: ${previousStatus} → ${status}`,
+    metadata: {
+      orderId: ot._id,
+      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
+      previousStatus,
+      newStatus: status,
+    },
+    req,
+  });
+
   res.json({ data: populated });
 }

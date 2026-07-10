@@ -3,6 +3,7 @@ import { Component, WorkOrder, BOMItem, ChairType } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { getPagination, getSkip } from '../utils/pagination';
 import { escapeRegex } from '../utils/escapeRegex';
+import { createAuditLog } from '../services/auditService';
 
 export async function reservas(_req: Request, res: Response) {
   const ordenes = await WorkOrder.find({ status: { $in: ['en_progreso', 'pausada'] } })
@@ -128,6 +129,17 @@ export async function create(req: Request, res: Response) {
   if (existe) throw ApiError.conflict('Ya existe un componente con ese nombre');
 
   const componente = await Component.create(req.body);
+
+  await createAuditLog({
+    action: 'component_created',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Creación del componente "${componente.name}"`,
+    metadata: { componentId: componente._id, name: componente.name },
+    req,
+  });
+
   res.status(201).json({ data: componente });
 }
 
@@ -143,12 +155,34 @@ export async function update(req: Request, res: Response) {
     runValidators: true,
   });
   if (!componente) throw ApiError.notFound('Componente no encontrado');
+
+  await createAuditLog({
+    action: 'component_updated',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Actualización del componente "${componente.name}"`,
+    metadata: { componentId: componente._id, name: componente.name, changes: req.body },
+    req,
+  });
+
   res.json({ data: componente });
 }
 
 export async function remove(req: Request, res: Response) {
   const componente = await Component.findByIdAndDelete(req.params.id);
   if (!componente) throw ApiError.notFound('Componente no encontrado');
+
+  await createAuditLog({
+    action: 'component_deleted',
+    severity: 'warning',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Eliminación del componente "${componente.name}"`,
+    metadata: { componentId: componente._id, name: componente.name },
+    req,
+  });
+
   res.json({ data: componente });
 }
 

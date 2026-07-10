@@ -3,6 +3,7 @@ import { Component, StockMovement } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { sillasPosiblesPorTipo } from '../services/stockService';
 import { clearStockCache, getCache, setCache } from '../utils/cache';
+import { createAuditLog } from '../services/auditService';
 
 export async function ingreso(req: Request, res: Response) {
   const { componenteId, cantidad, notas } = req.body;
@@ -23,6 +24,16 @@ export async function ingreso(req: Request, res: Response) {
     notes: notas,
     userId,
     userRole,
+  });
+
+  await createAuditLog({
+    action: 'stock_ingreso',
+    severity: 'info',
+    userId,
+    userRole,
+    description: `Ingreso de ${cantidad} unidades de "${componente.name}"`,
+    metadata: { componentId: componenteId, componentName: componente.name, quantity: cantidad, notes: notas },
+    req,
   });
 
   clearStockCache();
@@ -82,6 +93,16 @@ export async function ingresoMasivo(req: Request, res: Response) {
     }))
   );
 
+  await createAuditLog({
+    action: 'stock_ingreso_masivo',
+    severity: 'info',
+    userId,
+    userRole,
+    description: `Ingreso masivo de ${items.length} ítem(s)`,
+    metadata: { items, notasGenerales },
+    req,
+  });
+
   clearStockCache();
   res.json({ data: { processed: items.length } });
 }
@@ -111,6 +132,16 @@ export async function egreso(req: Request, res: Response) {
     notes: notas,
     userId,
     userRole,
+  });
+
+  await createAuditLog({
+    action: 'stock_egreso',
+    severity: 'info',
+    userId,
+    userRole,
+    description: `Egreso de ${cantidad} unidades de "${componente.name}"`,
+    metadata: { componentId: componenteId, componentName: componente.name, quantity: cantidad, notes: notas },
+    req,
   });
 
   clearStockCache();

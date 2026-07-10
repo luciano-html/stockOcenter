@@ -10,3 +10,5 @@ export { StockMovement } from './StockMovement';
 export type { IStockMovement, MovementType } from './StockMovement';
 export { User } from './User';
 export type { IUser } from './User';
+export { AuditLog } from './AuditLog';
+export type { IAuditLog, AuditAction, AuditSeverity } from './AuditLog';
