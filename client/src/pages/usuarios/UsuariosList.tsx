@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Search, Shield, User as UserIcon } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { GoBack } from '@/components/shared/GoBack'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -29,6 +30,7 @@ export default function UsuariosList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [confirmCreate, setConfirmCreate] = useState(false)
   const [page, setPage] = useState(1)
+  const [busqueda, setBusqueda] = useState('')
   const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery<{ data: User[]; pagination: Pagination }>({
@@ -58,12 +60,30 @@ export default function UsuariosList() {
     },
   })
 
+  const usuariosFiltrados = (data?.data ?? []).filter((u) => {
+    const term = busqueda.trim().toLowerCase()
+    if (!term) return true
+    return u.username.toLowerCase().includes(term) || u.name.toLowerCase().includes(term)
+  })
+
   return (
     <div className="space-y-4">
       <GoBack />
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">{data?.pagination.total ?? 0} usuarios</p>
-        <Button onClick={() => setOpen(true)}><Plus size={16} /> Nuevo usuario</Button>
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
+        <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setOpen(true)}>
+          <Plus size={16} className="mr-1" /> Nuevo usuario
+        </Button>
+      </div>
+
+      <div className="relative w-full sm:w-64">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" size={16} />
+        <Input
+          placeholder="Buscar usuario..."
+          className="pl-9"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
       </div>
 
       {isLoading ? <Skeleton className="h-64" /> : (
@@ -74,24 +94,32 @@ export default function UsuariosList() {
                 <TableHead>Usuario</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead className="w-16"></TableHead>
+                <TableHead className="w-16 text-right"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.data.map((u) => (
+              {usuariosFiltrados.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.username}</TableCell>
                   <TableCell>{u.name}</TableCell>
-                  <TableCell className="capitalize">{u.role}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteId(u.id)}>
-                      <Trash2 size={16} className="text-destructive" />
-                    </Button>
+                    {u.role === 'admin'
+                      ? <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50"><Shield size={12} className="mr-1" /> Admin</Badge>
+                      : <Badge variant="outline" className="text-gray-700 border-gray-300 bg-gray-100"><UserIcon size={12} className="mr-1" /> Operario</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(u.id)}>
+                        <Trash2 size={16} className="text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
-              {data?.data.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Sin usuarios</TableCell></TableRow>
+              {usuariosFiltrados.length === 0 && (
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                  {busqueda ? 'No hay usuarios que coincidan' : 'Sin usuarios'}
+                </TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -133,7 +161,7 @@ export default function UsuariosList() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => { setOpen(false); reset() }}>Cancelar</Button>
-            <Button type="submit" disabled={createMutation.isPending}>Crear</Button>
+            <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={createMutation.isPending}>Crear</Button>
           </div>
         </form>
       </Dialog>
@@ -152,7 +180,7 @@ export default function UsuariosList() {
         <p className="text-sm text-muted-foreground mb-4">Se creará un nuevo usuario con los datos ingresados.</p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setConfirmCreate(false)}>Cancelar</Button>
-          <Button onClick={() => { setConfirmCreate(false); handleSubmit((form) => createMutation.mutate(form))() }}>Confirmar</Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { setConfirmCreate(false); handleSubmit((form) => createMutation.mutate(form))() }}>Confirmar</Button>
         </div>
       </Dialog>
     </div>

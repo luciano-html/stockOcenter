@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search } from 'lucide-react'
+import { Search, History } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { GoBack } from '@/components/shared/GoBack'
 
 export default function MovimientosList() {
@@ -45,26 +46,38 @@ export default function MovimientosList() {
     setParams(next, { replace: true })
   }
 
+  const hasFilters = componenteId || tipo
+
   return (
     <div className="space-y-4">
       <GoBack />
-      <div className="flex flex-col sm:flex-row gap-2 items-end">
-        <div className="w-full sm:w-48">
-          <Select value={componenteId} onChange={(e) => updateParam('componenteId', e.target.value)}>
-            <option value="">Todos los componentes</option>
-            {compData?.data.map((c) => (
-              <option key={c._id} value={c._id}>{c.name}</option>
-            ))}
-          </Select>
-        </div>
-        <div className="w-full sm:w-36">
-          <Select value={tipo} onChange={(e) => updateParam('tipo', e.target.value)}>
-            <option value="">Todos</option>
-            <option value="ingreso">Ingreso</option>
-            <option value="egreso">Egreso</option>
-          </Select>
-        </div>
-        <Button onClick={buscar}><Search size={16} /> Buscar</Button>
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <History size={24} />
+          Historial de movimientos
+        </h1>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <Select value={componenteId} onChange={(e) => updateParam('componenteId', e.target.value)}>
+          <option value="">Todos los componentes</option>
+          {compData?.data.map((c) => (
+            <option key={c._id} value={c._id}>{c.name}</option>
+          ))}
+        </Select>
+        <Select value={tipo} onChange={(e) => updateParam('tipo', e.target.value)}>
+          <option value="">Todos los tipos</option>
+          <option value="ingreso">Ingreso</option>
+          <option value="egreso">Egreso</option>
+        </Select>
+        <Button onClick={buscar} className="bg-green-600 hover:bg-green-700 text-white">
+          <Search size={16} className="mr-1" /> Buscar
+        </Button>
+        {hasFilters && (
+          <Button variant="outline" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+            Limpiar
+          </Button>
+        )}
       </div>
 
       {isLoading ? <Skeleton className="h-64" /> : (
@@ -109,7 +122,11 @@ export default function MovimientosList() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={m.type === 'ingreso' ? 'secondary' : 'destructive'}>
+                        <Badge className={cn(
+                          m.type === 'ingreso'
+                            ? 'text-green-700 border-green-300 bg-green-50'
+                            : 'text-destructive border-destructive/50 bg-destructive/10'
+                        )} variant="outline">
                           {m.type === 'ingreso' ? 'Ingreso' : 'Egreso'}
                         </Badge>
                       </TableCell>

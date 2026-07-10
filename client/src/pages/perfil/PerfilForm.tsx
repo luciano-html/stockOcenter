@@ -48,7 +48,7 @@ export default function PerfilForm() {
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>Mi perfil</CardTitle></CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(() => setShowConfirm(true))} className="space-y-4">
+        <form onSubmit={handleSubmit(() => setShowConfirm(true))} className="space-y-5">
           <div className="space-y-2">
             <Label>Usuario</Label>
             <Input value={user?.username ?? ''} disabled />
@@ -69,7 +69,7 @@ export default function PerfilForm() {
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => navigate('/')}>Cancelar</Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={mutation.isPending}>
               {mutation.isPending ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </div>
@@ -85,7 +85,7 @@ export default function PerfilForm() {
         <p className="text-sm text-muted-foreground mb-4">Se actualizarán los datos de tu perfil.</p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
-          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
         </div>
       </Dialog>
     </div>

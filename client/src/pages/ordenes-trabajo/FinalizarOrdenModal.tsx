@@ -139,7 +139,7 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-            <Button onClick={handleNextFromStep1}>Siguiente</Button>
+            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleNextFromStep1}>Siguiente</Button>
           </div>
         </div>
       )}
@@ -172,7 +172,7 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setStep(1)}>Volver</Button>
-            <Button onClick={() => setStep(3)}>Confirmar egreso</Button>
+            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setStep(3)}>Confirmar egreso</Button>
           </div>
         </div>
       )}
@@ -204,7 +204,7 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setStep(2)}>Volver</Button>
-            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
               {mutation.isPending ? 'Finalizando...' : 'Confirmar finalización'}
             </Button>
           </div>
