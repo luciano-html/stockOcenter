@@ -65,7 +65,7 @@ export default function OrdenesTrabajoList() {
         .get('/ordenes-trabajo', {
           params: {
             estado: estadoFiltro || undefined,
-            chairTypeId: tipoSillaFiltro || undefined,
+            chairTypeId: tipoSillaFiltro && tipoSillaFiltro !== 'none' ? tipoSillaFiltro : undefined,
             page,
             limit: 50,
           },
@@ -98,14 +98,20 @@ export default function OrdenesTrabajoList() {
   })
 
   const ordenesFiltradas = useMemo(() => {
+    let rows = data?.data ?? []
+
+    if (tipoSillaFiltro === 'none') {
+      rows = rows.filter((ot) => !ot.chairTypeId)
+    }
+
     const term = busqueda.trim().toLowerCase()
-    if (!term) return data?.data ?? []
-    return (data?.data ?? []).filter((ot) => {
+    if (!term) return rows
+    return rows.filter((ot) => {
       const matchId = ot._id.toLowerCase().includes(term) || ot._id.slice(-6).includes(term)
       const matchSilla = ot.chairTypeId?.name?.toLowerCase().includes(term)
       return matchId || matchSilla
     })
-  }, [data, busqueda])
+  }, [data, busqueda, tipoSillaFiltro])
 
   function clearFilters() {
     setEstadoFiltro('')
