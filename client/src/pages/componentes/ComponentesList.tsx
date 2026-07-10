@@ -104,9 +104,9 @@ export default function ComponentesList() {
         )}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="relative sm:col-span-2 lg:col-span-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" size={16} />
           <Input placeholder="Buscar componente..." className="pl-9" value={search} onChange={(e) => {
             const next = new URLSearchParams(params)
             e.target.value ? next.set('q', e.target.value) : next.delete('q')
@@ -114,57 +114,58 @@ export default function ComponentesList() {
             setParams(next, { replace: true })
           }} />
         </div>
-        <div className="flex flex-wrap gap-2 flex-1">
-          <Select value={tipoFiltro} onChange={(e) => {
-            const next = new URLSearchParams(params)
-            e.target.value ? next.set('tipo', e.target.value) : next.delete('tipo')
-            next.delete('page')
-            setParams(next, { replace: true })
-          }} className="w-full sm:w-40">
-            <option value="">Todos los tipos</option>
-            {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
-          </Select>
-          <Select value={subtipoFiltro} onChange={(e) => {
-            const next = new URLSearchParams(params)
-            e.target.value ? next.set('subtipo', e.target.value) : next.delete('subtipo')
-            next.delete('page')
-            setParams(next, { replace: true })
-          }} className="w-full sm:w-40">
-            <option value="">Todos los sub-tipos</option>
-            {filtrosData?.data.subTipos.map((s) => <option key={s} value={s}>{s}</option>)}
-          </Select>
-          <Select value={marcaFiltro} onChange={(e) => {
-            const next = new URLSearchParams(params)
-            e.target.value ? next.set('marca', e.target.value) : next.delete('marca')
-            next.delete('page')
-            setParams(next, { replace: true })
-          }} className="w-full sm:w-40">
-            <option value="">Todas las marcas</option>
-            {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
-          </Select>
-        </div>
+        <Select value={tipoFiltro} onChange={(e) => {
+          const next = new URLSearchParams(params)
+          e.target.value ? next.set('tipo', e.target.value) : next.delete('tipo')
+          next.delete('page')
+          setParams(next, { replace: true })
+        }}>
+          <option value="">Todos los tipos</option>
+          {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
+        </Select>
+        <Select value={subtipoFiltro} onChange={(e) => {
+          const next = new URLSearchParams(params)
+          e.target.value ? next.set('subtipo', e.target.value) : next.delete('subtipo')
+          next.delete('page')
+          setParams(next, { replace: true })
+        }}>
+          <option value="">Todos los sub-tipos</option>
+          {filtrosData?.data.subTipos.map((s) => <option key={s} value={s}>{s}</option>)}
+        </Select>
+        <Select value={marcaFiltro} onChange={(e) => {
+          const next = new URLSearchParams(params)
+          e.target.value ? next.set('marca', e.target.value) : next.delete('marca')
+          next.delete('page')
+          setParams(next, { replace: true })
+        }}>
+          <option value="">Todas las marcas</option>
+          {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
+        </Select>
         <div className="flex gap-2">
           <Button
             type="button"
             variant={stockBajoFiltro ? 'destructive' : 'outline'}
             size="sm"
             onClick={toggleStockBajo}
-            className="whitespace-nowrap"
+            className="flex-1 whitespace-nowrap"
           >
             Stock bajo {stockBajoCount > 0 && `(${stockBajoCount})`}
           </Button>
           {reservas.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setShowReserved(true)} className="whitespace-nowrap">
+            <Button variant="outline" size="sm" onClick={() => setShowReserved(true)} className="flex-1 whitespace-nowrap">
               <Eye size={16} className="mr-1" /> En reserva ({reservas.length})
-            </Button>
-          )}
-          {(search || tipoFiltro || subtipoFiltro || marcaFiltro || stockBajoFiltro) && (
-            <Button variant="outline" size="sm" onClick={clearFilters} className="whitespace-nowrap">
-              Limpiar
             </Button>
           )}
         </div>
       </div>
+
+      {(search || tipoFiltro || subtipoFiltro || marcaFiltro || stockBajoFiltro) && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={clearFilters}>
+            Limpiar filtros
+          </Button>
+        </div>
+      )}
 
       {isLoading ? <Skeleton className="h-64" /> : (
         <div className="rounded-md border overflow-x-auto">
