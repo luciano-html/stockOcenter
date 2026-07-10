@@ -25,6 +25,7 @@ export interface ChairType {
   _id: string
   name: string
   description?: string
+  imageUrl?: string
   active: boolean
 }
 

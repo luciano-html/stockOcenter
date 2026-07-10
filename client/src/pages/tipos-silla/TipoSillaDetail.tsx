@@ -42,6 +42,18 @@ export default function TipoSillaDetail() {
         )}
       </div>
 
+      {tipo.imageUrl && (
+        <Card>
+          <CardContent className="p-4">
+            <img
+              src={tipo.imageUrl}
+              alt={tipo.name}
+              className="w-full max-h-80 object-contain rounded-md"
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

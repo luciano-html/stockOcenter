@@ -6,6 +6,8 @@ import { getPagination, getSkip } from '../utils/pagination';
 import { clearStockCache } from '../utils/cache';
 import { escapeRegex } from '../utils/escapeRegex';
 import { createAuditLog } from '../services/auditService';
+import { applyImageMatches, matchImagesToChairs } from '../services/chairImageService';
+import path from 'path';
 
 export async function list(req: Request, res: Response) {
   const { q, tipo, subtipo, marca, page, limit, sort, order } = req.query as {
@@ -326,4 +328,44 @@ export async function bomDetalle(req: Request, res: Response) {
       items,
     },
   });
+}
+
+export async function previewImageMatches(_req: Request, res: Response) {
+  const result = await matchImagesToChairs();
+  res.json({ data: result });
+}
+
+export async function applyImageMatchesController(req: Request, res: Response) {
+  const result = await applyImageMatches();
+
+  await createAuditLog({
+    action: 'chair_type_updated',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Vinculación automática de imágenes: ${result.matched} tipo(s) de silla actualizado(s)`,
+    metadata: { matched: result.matched, unmatched: result.unmatched },
+    req,
+  });
+
+  res.json({ data: result });
+}
+
+export async function uploadImage(req: Request, res: Response) {
+  if (!req.file) throw ApiError.badRequest('No se recibió ninguna imagen');
+
+  const filename = path.basename(req.file.filename);
+  const imageUrl = `/sillas/${filename}`;
+
+  await createAuditLog({
+    action: 'chair_type_updated',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: `Subida de imagen: ${filename}`,
+    metadata: { imageUrl, filename },
+    req,
+  });
+
+  res.status(201).json({ data: { imageUrl, filename } });
 }

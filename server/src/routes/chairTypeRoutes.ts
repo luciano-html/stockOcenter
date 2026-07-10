@@ -2,6 +2,7 @@ import { Router } from 'express';
 import * as chairTypeController from '../controllers/chairTypeController';
 import { validate } from '../middleware/validate';
 import { authenticate, authorize } from '../middleware/auth';
+import { uploadImage } from '../middleware/upload';
 import {
   createChairTypeSchema,
   updateChairTypeSchema,
@@ -14,6 +15,9 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', validate(listChairTypesQuerySchema, 'query'), chairTypeController.list);
+router.get('/imagenes/preview', authorize('admin'), chairTypeController.previewImageMatches);
+router.post('/imagenes/vincular', authorize('admin'), chairTypeController.applyImageMatchesController);
+router.post('/imagenes/upload', authorize('admin'), uploadImage, chairTypeController.uploadImage);
 router.post('/limpiar-huerfanos', authorize('admin'), chairTypeController.cleanupOrphans);
 router.get('/:id/sillas-posibles', validate(chairTypeParamsSchema, 'params'), chairTypeController.sillasPosibles);
 router.get('/:id/bom-detalle', validate(chairTypeParamsSchema, 'params'), chairTypeController.bomDetalle);

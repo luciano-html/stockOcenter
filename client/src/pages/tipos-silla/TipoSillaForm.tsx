@@ -14,7 +14,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { Plus, Trash2, AlertTriangle, Upload, X } from 'lucide-react'
 import { GoBack } from '@/components/shared/GoBack'
 
 const schema = z.object({
@@ -35,12 +35,32 @@ export default function TipoSillaForm() {
   const [bom, setBom] = useState<BOMEntry[]>([])
   const [selectedComponent, setSelectedComponent] = useState('')
   const [selectedQty, setSelectedQty] = useState(1)
+  const [imageUrl, setImageUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   const { data: tipoData, isLoading } = useQuery<{ data: ChairTypeWithBOM }>({
     queryKey: ['tipo-silla', id],
     queryFn: () => api.get(`/tipos-silla/${id}`).then((r) => r.data),
     enabled: isEdit,
   })
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const res = await api.post('/tipos-silla/imagenes/upload', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setImageUrl(res.data.data.imageUrl)
+    } catch {
+      // error handled by interceptor
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const { data: compData } = useQuery<{ data: Componente[]; pagination: { total: number } }>({
     queryKey: ['componentes-select'],
@@ -75,13 +95,16 @@ export default function TipoSillaForm() {
   })
 
   useEffect(() => {
-    if (isEdit && tipoData?.data.bom) {
-      setBom(
-        tipoData.data.bom.map((b) => ({
-          componentId: typeof b.componentId === 'string' ? b.componentId : b.componentId._id,
-          quantity: b.quantity,
-        }))
-      )
+    if (isEdit && tipoData?.data) {
+      setImageUrl(tipoData.data.imageUrl ?? '')
+      if (tipoData.data.bom) {
+        setBom(
+          tipoData.data.bom.map((b) => ({
+            componentId: typeof b.componentId === 'string' ? b.componentId : b.componentId._id,
+            quantity: b.quantity,
+          }))
+        )
+      }
     }
   }, [isEdit, tipoData])
 
@@ -97,8 +120,10 @@ export default function TipoSillaForm() {
   }
 
   const mutation = useMutation({
-    mutationFn: (form: FormData) =>
-      isEdit ? api.put(`/tipos-silla/${id}`, { ...form, bom }) : api.post('/tipos-silla', { ...form, bom }),
+    mutationFn: (form: FormData) => {
+      const payload = { ...form, bom, imageUrl: imageUrl || undefined }
+      return isEdit ? api.put(`/tipos-silla/${id}`, payload) : api.post('/tipos-silla', payload)
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['tipos-silla'] })
       navigate(`/tipos-silla/${res.data.data._id}`)
@@ -122,6 +147,36 @@ export default function TipoSillaForm() {
           <div className="space-y-2">
             <Label htmlFor="description">Descripción</Label>
             <Input id="description" {...register('description')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Imagen</Label>
+            <div className="flex items-start gap-4">
+              {imageUrl ? (
+                <div className="relative w-32 h-32 rounded-md border overflow-hidden shrink-0">
+                  <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 hover:bg-background"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-32 h-32 rounded-md border bg-muted flex items-center justify-center text-muted-foreground text-xs shrink-0">
+                  Sin imagen
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  <Upload size={16} />
+                  <span>{uploading ? 'Subiendo...' : 'Subir imagen'}</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                </label>
+                <p className="text-xs text-muted-foreground">JPG, PNG, WEBP o GIF. Máx 5 MB.</p>
+              </div>
+            </div>
           </div>
         </form>
 

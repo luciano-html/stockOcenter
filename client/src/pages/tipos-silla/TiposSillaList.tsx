@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, ChevronDown, Image } from 'lucide-react'
 import { useState } from 'react'
 import { GoBack } from '@/components/shared/GoBack'
 
@@ -26,6 +26,7 @@ export default function TiposSillaList() {
   const order = params.get('order') ?? 'desc'
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [matchMsg, setMatchMsg] = useState('')
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
@@ -60,6 +61,20 @@ export default function TiposSillaList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tipos-silla'] })
       setDeleteId(null)
+    },
+  })
+
+  const matchImagesMutation = useMutation({
+    mutationFn: () => api.post('/tipos-silla/imagenes/vincular').then((r) => r.data),
+    onSuccess: (res: { data: { matched: number; unmatched: string[] } }) => {
+      queryClient.invalidateQueries({ queryKey: ['tipos-silla'] })
+      const { matched, unmatched } = res.data
+      setMatchMsg(`Se vincularon ${matched} imagen(es).${unmatched.length > 0 ? ` Sin coincidencia: ${unmatched.length}.` : ''}`)
+      setTimeout(() => setMatchMsg(''), 5000)
+    },
+    onError: () => {
+      setMatchMsg('Error al vincular imágenes.')
+      setTimeout(() => setMatchMsg(''), 5000)
     },
   })
 
@@ -178,11 +193,27 @@ export default function TiposSillaList() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tipos de silla</h1>
         {isAdmin && (
-          <Link to="/tipos-silla/nuevo">
-            <Button className="bg-green-600 hover:bg-green-700 text-white"><Plus size={16} className="mr-1" /> Nuevo tipo</Button>
-          </Link>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => matchImagesMutation.mutate()}
+              disabled={matchImagesMutation.isPending}
+            >
+              <Image size={16} className="mr-1" />
+              {matchImagesMutation.isPending ? 'Vinculando...' : 'Vincular imágenes'}
+            </Button>
+            <Link to="/tipos-silla/nuevo">
+              <Button className="bg-green-600 hover:bg-green-700 text-white"><Plus size={16} className="mr-1" /> Nuevo tipo</Button>
+            </Link>
+          </div>
         )}
       </div>
+
+      {matchMsg && (
+        <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-700">
+          {matchMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="relative sm:col-span-2 lg:col-span-1">
@@ -234,6 +265,7 @@ export default function TiposSillaList() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-10"></TableHead>
+              <TableHead className="w-16">Imagen</TableHead>
               <TableHead>
                 <button
                   type="button"
@@ -283,6 +315,20 @@ export default function TiposSillaList() {
                       {expandedIds.has(t._id) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </button>
                   </TableCell>
+                  <TableCell>
+                    {t.imageUrl ? (
+                      <img
+                        src={t.imageUrl}
+                        alt={t.name}
+                        className="w-12 h-12 object-cover rounded-md border"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-md border bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                        Sin img
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{t.bomCount ?? 0} componentes</TableCell>
                   <TableCell>
@@ -318,7 +364,7 @@ export default function TiposSillaList() {
             ))}
             {data?.data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sin tipos de silla</TableCell>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">Sin tipos de silla</TableCell>
               </TableRow>
             )}
           </TableBody>

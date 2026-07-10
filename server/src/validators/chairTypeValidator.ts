@@ -9,12 +9,14 @@ const bomItemSchema = z.object({
 export const createChairTypeSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').trim(),
   description: z.string().trim().optional(),
+  imageUrl: z.string().trim().optional(),
   bom: z.array(bomItemSchema).default([]),
 });
 
 export const updateChairTypeSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').trim().optional(),
   description: z.string().trim().optional(),
+  imageUrl: z.string().trim().optional(),
   active: z.boolean().optional(),
   bom: z.array(bomItemSchema).optional(),
 });
