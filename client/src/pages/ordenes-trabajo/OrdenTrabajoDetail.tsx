@@ -8,8 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useState } from 'react'
-import { Play, Pause, CheckCircle, XCircle, Pencil, AlertTriangle } from 'lucide-react'
+import { Play, Pause, CheckCircle, XCircle, Pencil, AlertTriangle, Clock, User, Calendar, RotateCcw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { GoBack } from '@/components/shared/GoBack'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import FinalizarOrdenModal from './FinalizarOrdenModal'
@@ -30,19 +33,19 @@ const statusClass: Record<string, string> = {
   cancelada: 'bg-red-100 text-red-700 border-red-300',
 }
 
-const transitions: Record<string, { status: string; label: string; variant: 'default' | 'destructive' | 'secondary'; icon: typeof Play }[]> = {
+const transitions: Record<string, { status: string; label: string; className: string; icon: typeof Play }[]> = {
   pendiente: [
-    { status: 'en_progreso', label: 'Iniciar', variant: 'default', icon: Play },
-    { status: 'cancelada', label: 'Cancelar', variant: 'destructive', icon: XCircle },
+    { status: 'en_progreso', label: 'Iniciar', className: 'bg-green-600 hover:bg-green-700 text-white', icon: Play },
+    { status: 'cancelada', label: 'Cancelar', className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', icon: XCircle },
   ],
   en_progreso: [
-    { status: 'pausada', label: 'Pausar', variant: 'secondary', icon: Pause },
-    { status: 'finalizada', label: 'Finalizar', variant: 'default', icon: CheckCircle },
-    { status: 'cancelada', label: 'Cancelar', variant: 'destructive', icon: XCircle },
+    { status: 'pausada', label: 'Pausar', className: 'bg-amber-500 hover:bg-amber-600 text-white', icon: Pause },
+    { status: 'finalizada', label: 'Finalizar', className: 'bg-green-600 hover:bg-green-700 text-white', icon: CheckCircle },
+    { status: 'cancelada', label: 'Cancelar', className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', icon: XCircle },
   ],
   pausada: [
-    { status: 'en_progreso', label: 'Reanudar', variant: 'default', icon: Play },
-    { status: 'cancelada', label: 'Cancelar', variant: 'destructive', icon: XCircle },
+    { status: 'en_progreso', label: 'Reanudar', className: 'bg-green-600 hover:bg-green-700 text-white', icon: RotateCcw },
+    { status: 'cancelada', label: 'Cancelar', className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', icon: XCircle },
   ],
 }
 
@@ -62,12 +65,80 @@ function AuditInfo({ ot }: { ot: WorkOrder }) {
   )
 }
 
+function OrderTimeline({ ot }: { ot: WorkOrder }) {
+  const steps: { label: string; icon: typeof Clock; date?: string; user?: { name: string; role: string }; active: boolean; className?: string }[] = [
+    {
+      label: 'Creada',
+      icon: Calendar,
+      date: ot.createdAt,
+      user: ot.createdBy,
+      active: true,
+      className: 'text-muted-foreground',
+    },
+    {
+      label: 'Iniciada',
+      icon: Play,
+      date: ot.startedAt,
+      user: ot.startedBy,
+      active: !!ot.startedAt,
+      className: 'text-blue-600',
+    },
+    {
+      label: ot.status === 'cancelada' ? 'Cancelada' : 'Finalizada',
+      icon: ot.status === 'cancelada' ? XCircle : CheckCircle,
+      date: ot.finalizedAt,
+      user: ot.finalizedBy,
+      active: ot.status === 'finalizada' || ot.status === 'cancelada',
+      className: ot.status === 'cancelada' ? 'text-destructive' : 'text-green-600',
+    },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-medium flex items-center gap-2">
+        <Clock size={16} className="text-muted-foreground" />
+        Historial de estados
+      </h3>
+      <div className="relative">
+        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border" />
+        <div className="space-y-6">
+          {steps.map((step, idx) => (
+            <div key={idx} className="relative flex items-start gap-3">
+              <div className={cn(
+                'relative z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center bg-background',
+                step.active ? `border-current ${step.className}` : 'border-muted-foreground text-muted-foreground'
+              )}>
+                <step.icon size={12} />
+              </div>
+              <div className="flex-1">
+                <p className={cn('text-sm font-medium', step.active ? step.className : 'text-muted-foreground')}>
+                  {step.label}
+                </p>
+                {step.date && (
+                  <p className="text-xs text-muted-foreground">{new Date(step.date).toLocaleString()}</p>
+                )}
+                {step.user && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <User size={10} />
+                    {step.user.name} ({step.user.role})
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function OrdenTrabajoDetail() {
   const { id } = useParams()
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const [confirmStatus, setConfirmStatus] = useState<string | null>(null)
+  const [statusNotes, setStatusNotes] = useState('')
   const [showFinalize, setShowFinalize] = useState(false)
   const [stockError, setStockError] = useState<{ componentId: string; name: string; necesario: number; disponible: number }[] | null>(null)
 
@@ -83,7 +154,8 @@ export default function OrdenTrabajoDetail() {
   })
 
   const mutation = useMutation({
-    mutationFn: (status: string) => api.patch(`/ordenes-trabajo/${id}/estado`, { status }),
+    mutationFn: ({ status, notes }: { status: string; notes?: string }) =>
+      api.patch(`/ordenes-trabajo/${id}/estado`, { status, notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orden-trabajo', id] })
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
@@ -150,6 +222,8 @@ export default function OrdenTrabajoDetail() {
             )}
           </div>
 
+          <OrderTimeline ot={ot} />
+
           {isAdmin && <AuditInfo ot={ot} />}
 
           {ot.operatorNotes && (
@@ -164,7 +238,7 @@ export default function OrdenTrabajoDetail() {
               {actions.map((action) => (
                 <Button
                   key={action.status}
-                  variant={action.variant}
+                  className={cn(action.className, 'gap-2')}
                   onClick={() => setConfirmStatus(action.status)}
                 >
                   <action.icon size={16} /> {action.label}
@@ -219,7 +293,7 @@ export default function OrdenTrabajoDetail() {
         </Card>
       )}
 
-      <Dialog open={!!confirmStatus} onOpenChange={() => setConfirmStatus(null)}>
+      <Dialog open={!!confirmStatus} onOpenChange={() => { setConfirmStatus(null); setStatusNotes('') }}>
         <DialogHeader>
           <DialogTitle>
             {confirmStatus === 'finalizada' ? '¿Finalizar orden?' :
@@ -234,11 +308,25 @@ export default function OrdenTrabajoDetail() {
            confirmStatus === 'en_progreso' ? 'Se reservará el stock necesario.' :
            'La orden se pausará, la reserva de stock se mantiene.'}
         </p>
+        <div className="space-y-3 mb-4">
+          <Label htmlFor="statusNotes">Notas (opcional)</Label>
+          <Input
+            id="statusNotes"
+            placeholder="ej. Iniciada con material disponible, pausada por falta de..."
+            value={statusNotes}
+            onChange={(e) => setStatusNotes(e.target.value)}
+          />
+        </div>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setConfirmStatus(null)}>Volver</Button>
           <Button
-            variant={confirmStatus === 'cancelada' ? 'destructive' : 'default'}
-            onClick={() => confirmStatus && mutation.mutate(confirmStatus)}
+            className={cn(
+              confirmStatus === 'cancelada' && 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+              confirmStatus === 'en_progreso' && 'bg-green-600 hover:bg-green-700 text-white',
+              confirmStatus === 'pausada' && 'bg-amber-500 hover:bg-amber-600 text-white',
+              confirmStatus === 'finalizada' && 'bg-green-600 hover:bg-green-700 text-white'
+            )}
+            onClick={() => confirmStatus && mutation.mutate({ status: confirmStatus, notes: statusNotes || undefined })}
             disabled={mutation.isPending}
           >
             {mutation.isPending ? 'Procesando...' : 'Confirmar'}

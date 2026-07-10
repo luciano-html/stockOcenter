@@ -5,17 +5,19 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/services/api'
+import { cn } from '@/lib/utils'
 import type { ChairTypeWithBOM, Componente, AxiosErrorType, WorkOrder } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { Autocomplete } from '@/components/ui/autocomplete'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { GoBack } from '@/components/shared/GoBack'
-import { Plus, Trash2, Package, Wrench } from 'lucide-react'
+import { Plus, Trash2, Package, Wrench, AlertTriangle, Info, CheckCircle } from 'lucide-react'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 const itemRowSchema: z.ZodType<
@@ -181,6 +183,42 @@ export default function OrdenTrabajoForm() {
     [tipoSillaOptions, chairTypeId]
   )
 
+  const selectedChair = useMemo(
+    () => tiposData?.data.find((t) => t._id === chairTypeId),
+    [tiposData, chairTypeId]
+  )
+
+  const sillasPosibles = selectedChair?.sillasPosibles ?? 0
+  const excedeCapacidad = tipoOrden === 'silla' && chairTypeId && (Number(quantity) || 0) > sillasPosibles
+
+  const requerimientos = useMemo(() => {
+    if (!compData) return []
+    const map = new Map<string, { componente: Componente; necesario: number }>()
+
+    function addReq(componentId: string, qty: number) {
+      const comp = componentMap.get(componentId)
+      if (!comp || qty <= 0) return
+      const current = map.get(componentId) ?? { componente: comp, necesario: 0 }
+      current.necesario += qty
+      map.set(componentId, current)
+    }
+
+    if (tipoOrden === 'silla' && selectedChair) {
+      selectedChair.bom.forEach((bomItem) => {
+        const compId = typeof bomItem.componentId === 'string' ? bomItem.componentId : bomItem.componentId._id
+        addReq(compId, (Number(quantity) || 0) * bomItem.quantity)
+      })
+    }
+
+    adicFields.forEach((item) => addReq(item.componentId, item.quantity))
+    repFields.forEach((item) => addReq(item.componentId, item.quantity))
+
+    return Array.from(map.values()).sort((a, b) => a.componente.name.localeCompare(b.componente.name))
+  }, [tipoOrden, selectedChair, quantity, adicFields, repFields, compData, componentMap])
+
+  const faltantes = requerimientos.filter((r) => r.necesario > r.componente.stockDisponible)
+  const hayStockSuficiente = faltantes.length === 0
+
   const buildPayload = (form: FormData) => ({
     ...(form.tipoOrden === 'silla' && form.chairTypeId ? { chairTypeId: form.chairTypeId } : {}),
     quantity: form.quantity,
@@ -282,11 +320,78 @@ export default function OrdenTrabajoForm() {
               {errors.repuestos && <p className="text-xs text-destructive">{errors.repuestos.message}</p>}
             </div>
 
+            {requerimientos.length > 0 && (
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Info size={16} className="text-muted-foreground" />
+                  <Label className="text-sm font-medium">Disponibilidad</Label>
+                </div>
+
+                {tipoOrden === 'silla' && chairTypeId && (
+                  <div className={cn(
+                    'rounded-md border p-3 text-sm',
+                    excedeCapacidad ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-green-50 border-green-200 text-green-900'
+                  )}>
+                    <div className="flex items-center gap-2">
+                      {excedeCapacidad ? <AlertTriangle size={16} /> : <CheckCircle size={16} />}
+                      <span className="font-medium">
+                        {excedeCapacidad
+                          ? `Con el stock actual solo se pueden fabricar ${sillasPosibles} silla(s).`
+                          : `Stock suficiente para fabricar hasta ${sillasPosibles} silla(s).`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Componente</TableHead>
+                        <TableHead className="text-right">Necesario</TableHead>
+                        <TableHead className="text-right">Disponible</TableHead>
+                        <TableHead className="text-right">Faltante</TableHead>
+                        <TableHead>Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {requerimientos.map(({ componente, necesario }) => {
+                        const faltante = Math.max(0, necesario - componente.stockDisponible)
+                        const ok = faltante === 0
+                        return (
+                          <TableRow key={componente._id}>
+                            <TableCell className="font-medium">{componente.name}</TableCell>
+                            <TableCell className="text-right">{necesario} {componente.unit}</TableCell>
+                            <TableCell className="text-right">{componente.stockDisponible} {componente.unit}</TableCell>
+                            <TableCell className={cn('text-right font-medium', !ok && 'text-destructive')}>
+                              {faltante > 0 ? `${faltante} ${componente.unit}` : '—'}
+                            </TableCell>
+                            <TableCell>
+                              {ok
+                                ? <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50"><CheckCircle size={12} className="mr-1" /> OK</Badge>
+                                : <Badge variant="destructive"><AlertTriangle size={12} className="mr-1" /> Falta</Badge>}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {!hayStockSuficiente && (
+                  <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive flex items-start gap-2">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                    <span>La orden no se podrá iniciar hasta cargar stock de los componentes marcados. Podés guardarla como pendiente y avisar al área de compras.</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {errors.root && <p className="text-xs text-destructive">{errors.root.message}</p>}
 
             <div className="flex gap-2 justify-end pt-2">
               <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
-              <Button type="submit" disabled={mutation.isPending}>
+              <Button type="submit" disabled={mutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
                 {mutation.isPending ? 'Guardando...' : (isEditing ? 'Guardar cambios' : 'Crear orden')}
               </Button>
             </div>
