@@ -20,6 +20,7 @@ export default function TiposSillaList() {
   const tipoFiltro = params.get('tipo') ?? ''
   const subtipoFiltro = params.get('subtipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
+  const activeFiltro = params.get('active') ?? ''
   const page = Number(params.get('page') ?? '1')
   const sort = params.get('sort') ?? 'posibles'
   const order = params.get('order') ?? 'desc'
@@ -30,7 +31,7 @@ export default function TiposSillaList() {
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM[]; pagination: Pagination }>({
-    queryKey: ['tipos-silla', search, tipoFiltro, subtipoFiltro, marcaFiltro, page, sort, order],
+    queryKey: ['tipos-silla', search, tipoFiltro, subtipoFiltro, marcaFiltro, activeFiltro, page, sort, order],
     queryFn: () =>
       api
         .get('/tipos-silla', {
@@ -39,6 +40,7 @@ export default function TiposSillaList() {
             tipo: tipoFiltro || undefined,
             subtipo: subtipoFiltro || undefined,
             marca: marcaFiltro || undefined,
+            active: activeFiltro || undefined,
             page,
             limit: 50,
             sort,
@@ -174,7 +176,16 @@ export default function TiposSillaList() {
     <div className="space-y-4">
       <GoBack />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-64">
+        <h1 className="text-2xl font-bold tracking-tight">Tipos de silla</h1>
+        {isAdmin && (
+          <Link to="/tipos-silla/nuevo">
+            <Button className="bg-green-600 hover:bg-green-700 text-white"><Plus size={16} className="mr-1" /> Nuevo tipo</Button>
+          </Link>
+        )}
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <Input
             placeholder="Buscar tipo de silla..."
@@ -183,30 +194,35 @@ export default function TiposSillaList() {
             onChange={(e) => updateParam('q', e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Select value={tipoFiltro} onChange={(e) => updateParam('tipo', e.target.value)} className="w-40">
+        <div className="flex flex-wrap gap-2 flex-1">
+          <Select value={tipoFiltro} onChange={(e) => updateParam('tipo', e.target.value)} className="w-full sm:w-40">
             <option value="">Todos los tipos</option>
             {filtrosData?.data.tipos.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </Select>
-          <Select value={subtipoFiltro} onChange={(e) => updateParam('subtipo', e.target.value)} className="w-40">
+          <Select value={subtipoFiltro} onChange={(e) => updateParam('subtipo', e.target.value)} className="w-full sm:w-40">
             <option value="">Todos los sub-tipos</option>
             {filtrosData?.data.subTipos.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </Select>
-          <Select value={marcaFiltro} onChange={(e) => updateParam('marca', e.target.value)} className="w-40">
+          <Select value={marcaFiltro} onChange={(e) => updateParam('marca', e.target.value)} className="w-full sm:w-40">
             <option value="">Todas las marcas</option>
             {filtrosData?.data.marcas.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
           </Select>
+          <Select value={activeFiltro} onChange={(e) => updateParam('active', e.target.value)} className="w-full sm:w-36">
+            <option value="">Todos</option>
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+          </Select>
         </div>
-        {isAdmin && (
-          <Link to="/tipos-silla/nuevo">
-            <Button><Plus size={16} /> Nuevo tipo</Button>
-          </Link>
+        {(search || tipoFiltro || subtipoFiltro || marcaFiltro || activeFiltro) && (
+          <Button variant="outline" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+            Limpiar
+          </Button>
         )}
       </div>
 
@@ -273,7 +289,11 @@ export default function TiposSillaList() {
                       {t.sillasPosibles ?? 0}
                     </Badge>
                   </TableCell>
-                  <TableCell>{t.active ? 'Sí' : 'No'}</TableCell>
+                  <TableCell>
+                    {t.active
+                      ? <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">Activo</Badge>
+                      : <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-100">Inactivo</Badge>}
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                       <Link to={`/tipos-silla/${t._id}`}>

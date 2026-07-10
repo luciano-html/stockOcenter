@@ -83,7 +83,7 @@ export default function ComponenteForm() {
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>{isEdit ? 'Editar componente' : 'Nuevo componente'}</CardTitle></CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit((form) => mutation.mutate(form))} className="space-y-4">
+        <form onSubmit={handleSubmit((form) => mutation.mutate(form))} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" {...register('name')} />
@@ -125,14 +125,15 @@ export default function ComponenteForm() {
               {errors.unit && <p className="text-xs text-destructive">{errors.unit.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stockMinimo">Alerta</Label>
+              <Label htmlFor="stockMinimo">Stock mínimo</Label>
               <Input id="stockMinimo" type="number" {...register('stockMinimo')} />
+              <p className="text-xs text-muted-foreground">Se marcará como stock bajo cuando el disponible sea menor o igual a este valor.</p>
               {errors.stockMinimo && <p className="text-xs text-destructive">{errors.stockMinimo.message}</p>}
             </div>
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => navigate('/componentes')}>Cancelar</Button>
-            <Button type="button" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>{mutation.isPending ? 'Guardando...' : 'Guardar'}</Button>
+            <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>{mutation.isPending ? 'Guardando...' : 'Guardar'}</Button>
           </div>
         </form>
       </CardContent>
@@ -147,7 +148,7 @@ export default function ComponenteForm() {
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
-          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
         </div>
       </Dialog>
     </div>

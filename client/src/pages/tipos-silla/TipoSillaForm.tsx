@@ -151,8 +151,17 @@ export default function TipoSillaForm() {
                 placeholder="Buscar componente..."
               />
             </div>
-            <Input type="number" min={1} className="w-24" value={selectedQty} onChange={(e) => setSelectedQty(Number(e.target.value))} />
-            <Button type="button" variant="outline" onClick={addBOM} disabled={!selectedComponent}><Plus size={16} /> Agregar</Button>
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Cant."
+              className="w-24"
+              value={selectedQty}
+              onChange={(e) => setSelectedQty(Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))}
+            />
+            <Button type="button" variant="outline" onClick={addBOM} disabled={!selectedComponent || selectedQty < 1}>
+              <Plus size={16} className="mr-1" /> Agregar
+            </Button>
           </div>
 
           {bom.length > 0 && (
@@ -197,12 +206,12 @@ export default function TipoSillaForm() {
           )}
         </div>
 
-        <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => navigate('/tipos-silla')}>Cancelar</Button>
-            <Button type="button" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>
+            <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>
              {mutation.isPending ? 'Guardando...' : 'Guardar'}
             </Button>
-        </div>
+          </div>
       </CardContent>
     </Card>
 
@@ -215,7 +224,7 @@ export default function TipoSillaForm() {
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
-          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
         </div>
       </Dialog>
     </div>

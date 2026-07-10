@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { Componente, ComponenteFiltros, ReservaItem, Pagination } from '@/types'
+import type { Componente, ComponenteFiltros, ReservaItem, Pagination, StockResumen } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Search, Eye } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Eye, AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 import { GoBack } from '@/components/shared/GoBack'
 
 export default function ComponentesList() {
@@ -48,6 +49,13 @@ export default function ComponentesList() {
     queryFn: () => api.get('/componentes/filtros').then((r) => r.data),
   })
 
+  const { data: resumenData } = useQuery<{ data: StockResumen }>({
+    queryKey: ['stock-resumen'],
+    queryFn: () => api.get('/stock/resumen').then((r) => r.data),
+    refetchInterval: 30000,
+    staleTime: 15000,
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/componentes/${id}`),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['componentes'] }); setDeleteId(null) },
@@ -60,6 +68,12 @@ export default function ComponentesList() {
   })
 
   const reservas = reservasData?.data ?? []
+  const stockBajoCount = (resumenData?.data.componentes ?? []).filter((c) => c.stockBajo).length
+
+  function clearFilters() {
+    const next = new URLSearchParams()
+    setParams(next, { replace: true })
+  }
 
   function toggleStockBajo() {
     const next = new URLSearchParams(params)
@@ -82,58 +96,74 @@ export default function ComponentesList() {
     <div className="space-y-4">
       <GoBack />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-64">
+        <h1 className="text-2xl font-bold tracking-tight">Componentes</h1>
+        {isAdmin && (
+          <Link to="/componentes/nuevo">
+            <Button className="bg-green-600 hover:bg-green-700 text-white"><Plus size={16} className="mr-1" /> Nuevo componente</Button>
+          </Link>
+        )}
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <Input placeholder="Buscar componente..." className="pl-9" value={search} onChange={(e) => {
             const next = new URLSearchParams(params)
             e.target.value ? next.set('q', e.target.value) : next.delete('q')
+            next.delete('page')
             setParams(next, { replace: true })
           }} />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-2 flex-1">
           <Select value={tipoFiltro} onChange={(e) => {
             const next = new URLSearchParams(params)
             e.target.value ? next.set('tipo', e.target.value) : next.delete('tipo')
+            next.delete('page')
             setParams(next, { replace: true })
-          }} className="w-40">
+          }} className="w-full sm:w-40">
             <option value="">Todos los tipos</option>
             {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
           </Select>
           <Select value={subtipoFiltro} onChange={(e) => {
             const next = new URLSearchParams(params)
             e.target.value ? next.set('subtipo', e.target.value) : next.delete('subtipo')
+            next.delete('page')
             setParams(next, { replace: true })
-          }} className="w-40">
+          }} className="w-full sm:w-40">
             <option value="">Todos los sub-tipos</option>
             {filtrosData?.data.subTipos.map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
-          <Select value={marcaFiltro} onChange={(e) => { 
+          <Select value={marcaFiltro} onChange={(e) => {
             const next = new URLSearchParams(params)
             e.target.value ? next.set('marca', e.target.value) : next.delete('marca')
+            next.delete('page')
             setParams(next, { replace: true })
-          }} className="w-40">
+          }} className="w-full sm:w-40">
             <option value="">Todas las marcas</option>
             {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
           </Select>
+        </div>
+        <div className="flex gap-2">
           <Button
             type="button"
             variant={stockBajoFiltro ? 'destructive' : 'outline'}
             size="sm"
             onClick={toggleStockBajo}
+            className="whitespace-nowrap"
           >
-            Stock bajo
+            Stock bajo {stockBajoCount > 0 && `(${stockBajoCount})`}
           </Button>
+          {reservas.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setShowReserved(true)} className="whitespace-nowrap">
+              <Eye size={16} className="mr-1" /> En reserva ({reservas.length})
+            </Button>
+          )}
+          {(search || tipoFiltro || subtipoFiltro || marcaFiltro || stockBajoFiltro) && (
+            <Button variant="outline" size="sm" onClick={clearFilters} className="whitespace-nowrap">
+              Limpiar
+            </Button>
+          )}
         </div>
-        {reservas.length > 0 && (
-          <Button variant="outline" onClick={() => setShowReserved(true)}>
-            <Eye size={16} /> En reserva ({reservas.length})
-          </Button>
-        )}
-        {isAdmin && (
-          <Link to="/componentes/nuevo">
-            <Button><Plus size={16} /> Nuevo componente</Button>
-          </Link>
-        )}
       </div>
 
       {isLoading ? <Skeleton className="h-64" /> : (
@@ -145,51 +175,52 @@ export default function ComponentesList() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Sub-tipo</TableHead>
                 <TableHead>Marca</TableHead>
-                <TableHead>Unidad</TableHead>
-                <TableHead>Reservado</TableHead>
-                <TableHead>Disponible</TableHead>
-                <TableHead>Alerta</TableHead>
+                <TableHead className="text-right">Reservado</TableHead>
+                <TableHead className="text-right">Disponible</TableHead>
+                <TableHead className="text-right">Mínimo</TableHead>
                 <TableHead>Estado</TableHead>
-                {isAdmin && <TableHead className="w-24">Acciones</TableHead>}
+                {isAdmin && <TableHead className="w-24 text-right">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.data.map((c) => (
-                <TableRow key={c._id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.subtipo || '—'}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.marca || '—'}</TableCell>
-                  <TableCell>{c.unit}</TableCell>
-                  <TableCell className={c.stockReservado > 0 ? 'text-amber-600 font-bold' : ''}>{c.stockReservado}</TableCell>
-                  <TableCell>
-                    <Badge variant={getDisponibleBadgeVariant(c.stockDisponible, c.stockMinimo)}>
-                      {c.stockDisponible}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{c.stockMinimo}</TableCell>
-                  <TableCell>
-                    {c.stockDisponible <= c.stockMinimo
-                      ? <Badge variant="destructive">Stock bajo</Badge>
-                      : <Badge variant="secondary">Normal</Badge>
-                    }
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Link to={`/componentes/${c._id}`}>
-                          <Button variant="ghost" size="icon"><Pencil size={16} /></Button>
-                        </Link>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteId(c._id)}>
-                          <Trash2 size={16} className="text-destructive" />
-                        </Button>
-                      </div>
+              {data?.data.map((c) => {
+                const isBajo = c.stockBajo
+                return (
+                  <TableRow key={c._id} className={cn(isBajo && 'bg-red-50/60')}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{c.subtipo || '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{c.marca || '—'}</TableCell>
+                    <TableCell className={cn('text-right', c.stockReservado > 0 && 'text-amber-600 font-bold')}>{c.stockReservado}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant={getDisponibleBadgeVariant(c.stockDisponible, c.stockMinimo)}>
+                        {c.stockDisponible}
+                      </Badge>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    <TableCell className="text-right text-muted-foreground">{c.stockMinimo}</TableCell>
+                    <TableCell>
+                      {isBajo
+                        ? <Badge variant="destructive"><AlertTriangle size={12} className="mr-1" /> Stock bajo</Badge>
+                        : <Badge variant="secondary">Normal</Badge>
+                      }
+                    </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <div className="flex gap-1 justify-end">
+                          <Link to={`/componentes/${c._id}`}>
+                            <Button variant="ghost" size="icon"><Pencil size={16} /></Button>
+                          </Link>
+                          <Button variant="ghost" size="icon" onClick={() => setDeleteId(c._id)}>
+                            <Trash2 size={16} className="text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                )
+              })}
               {data?.data.length === 0 && (
-                <TableRow><TableCell colSpan={isAdmin ? 10 : 9} className="text-center text-muted-foreground py-8">Sin componentes</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 9 : 8} className="text-center text-muted-foreground py-8">Sin componentes</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

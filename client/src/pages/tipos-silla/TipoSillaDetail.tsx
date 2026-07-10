@@ -9,7 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { GoBack } from '@/components/shared/GoBack'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import { Pencil } from 'lucide-react'
+import { Pencil, Package, Armchair, AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function TipoSillaDetail() {
   const { id } = useParams()
@@ -26,38 +27,73 @@ export default function TipoSillaDetail() {
 
   const tipo = data.data
   const bom = tipo.bom ?? []
+  const sillasPosibles = tipo.sillasPosibles ?? 0
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <GoBack />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              {tipo.name}
-              <Badge variant="outline">{tipo.active ? 'Activo' : 'Inactivo'}</Badge>
-            </CardTitle>
-          </div>
-          {isAdmin && (
-            <Link to={`/tipos-silla/${tipo._id}/editar`}>
-              <Button variant="outline" size="sm"><Pencil size={16} className="mr-1" /> Editar</Button>
-            </Link>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {tipo.description ? (
-            <p className="text-sm text-muted-foreground">{tipo.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">Sin descripción</p>
-          )}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">{tipo.name}</h1>
+        {isAdmin && (
+          <Link to={`/tipos-silla/${tipo._id}/editar`}>
+            <Button variant="outline" size="sm"><Pencil size={16} className="mr-1" /> Editar</Button>
+          </Link>
+        )}
+      </div>
 
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Armchair size={12} /> Estado</p>
+              {tipo.active
+                ? <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">Activo</Badge>
+                : <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-100">Inactivo</Badge>}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1"><Package size={12} /> Componentes</p>
+              <p className="font-medium">{bom.length}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">Sillas posibles</p>
+              <p className={cn('font-bold', sillasPosibles === 0 ? 'text-destructive' : 'text-green-600')}>
+                {sillasPosibles}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Stock limitante</p>
+              {tipo.sillasPosibles === 0 && bom.length > 0 ? (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle size={12} /> Sin stock
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Disponible</p>
+              )}
+            </div>
+          </div>
+          {tipo.description ? (
+            <p className="text-sm text-muted-foreground mt-4 border-t pt-3">{tipo.description}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground italic mt-4 border-t pt-3">Sin descripción</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Package size={18} />
+            Lista de materiales
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Componente</TableHead>
-                  <TableHead>Cantidad por silla</TableHead>
+                  <TableHead className="text-right">Cantidad por silla</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -71,12 +107,18 @@ export default function TipoSillaDetail() {
                   return (
                     <TableRow key={item._id} className={!comp ? 'bg-amber-50' : undefined}>
                       <TableCell className="font-medium">
-                        {comp ? comp.name : 'Componente no encontrado'}
-                        {!comp && (
-                          <span className="font-mono text-xs text-muted-foreground ml-1">({compIdString})</span>
+                        {comp ? (
+                          <Link to={`/componentes/${compIdString}`} className="hover:text-primary hover:underline">
+                            {comp.name}
+                          </Link>
+                        ) : (
+                          <span className="text-amber-700">
+                            Componente no encontrado
+                            <span className="font-mono text-xs text-muted-foreground ml-1">({compIdString})</span>
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell>{item.quantity} {comp?.unit ?? ''}</TableCell>
+                      <TableCell className="text-right">{item.quantity} {comp?.unit ?? ''}</TableCell>
                     </TableRow>
                   )
                 })}
