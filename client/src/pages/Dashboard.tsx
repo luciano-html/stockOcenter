@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
@@ -8,7 +8,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Package, AlertTriangle, ClipboardList, TrendingUp, Armchair, AlertCircle } from 'lucide-react'
+import LowStockAlert from '@/components/movements/LowStockAlert'
+import { cn } from '@/lib/utils'
+import { Plus, Package, AlertTriangle, ClipboardList, TrendingUp, Armchair, AlertCircle, ChevronDown } from 'lucide-react'
 import StockMovementsTable from '@/components/movements/StockMovementsTable'
 
 const statusLabels: Record<string, string> = {
@@ -45,6 +47,7 @@ function startOfToday() {
 export default function Dashboard() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const [showStockBajo, setShowStockBajo] = useState(false)
 
   const { data: resumenData, isLoading: resumenLoading, isError: resumenError } = useQuery<{ data: StockResumen }>({
     queryKey: ['stock-resumen'],
@@ -177,6 +180,30 @@ export default function Dashboard() {
           </Link>
         ))}
       </div>
+
+      <Card className={cn(stockBajoCount > 0 ? 'border-destructive' : undefined)}>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            <button
+              type="button"
+              onClick={() => setShowStockBajo((prev) => !prev)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
+              <AlertTriangle size={18} className={stockBajoCount > 0 ? 'text-destructive' : 'text-muted-foreground'} />
+              Alertas de stock bajo
+              <ChevronDown size={16} className={cn('transition-transform', showStockBajo && 'rotate-180')} />
+            </button>
+            <Link to="/componentes?stockBajo=true">
+              <Badge variant={stockBajoCount > 0 ? 'destructive' : 'outline'}>{stockBajoCount}</Badge>
+            </Link>
+          </CardTitle>
+        </CardHeader>
+        {showStockBajo && (
+          <CardContent className="pt-0">
+            <LowStockAlert componentes={resumenData?.data.componentes ?? []} />
+          </CardContent>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {(['pendiente', 'en_progreso', 'pausada', 'finalizada'] as const).map((status) => (

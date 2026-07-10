@@ -1,6 +1,10 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/services/api'
+import type { StockResumen } from '@/types'
+import { Badge } from '@/components/ui/badge'
 import {
   LayoutDashboard, Package, ArmchairIcon, ClipboardList, LogOut, X, Truck, Users, User,
 } from 'lucide-react'
@@ -25,6 +29,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const isAdmin = user?.role === 'admin'
   const links = isAdmin ? adminLinks : operarioLinks
 
+  const { data: resumenData } = useQuery<{ data: StockResumen }>({
+    queryKey: ['stock-resumen'],
+    queryFn: () => api.get('/stock/resumen').then((r) => r.data),
+    refetchInterval: 30000,
+    staleTime: 15000,
+  })
+
+  const stockBajoCount = (resumenData?.data.componentes ?? []).filter((c) => c.stockBajo).length
+
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />}
@@ -42,25 +55,33 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/'}
-              onClick={onClose}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                )
-              }
-            >
-              <link.icon size={18} />
-              {link.label}
-            </NavLink>
-          ))}
+          {links.map((link) => {
+            const showBadge = link.to === '/componentes' && stockBajoCount > 0
+            return (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.to === '/'}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                    isActive
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )
+                }
+              >
+                <link.icon size={18} />
+                <span className="flex-1">{link.label}</span>
+                {showBadge && (
+                  <Badge variant="destructive" className="h-5 min-w-5 flex items-center justify-center px-1.5 text-xs">
+                    {stockBajoCount}
+                  </Badge>
+                )}
+              </NavLink>
+            )
+          })}
         </nav>
 
         <div className="p-4 border-t border-sidebar-border space-y-1 mt-auto">

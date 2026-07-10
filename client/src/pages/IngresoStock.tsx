@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
@@ -13,7 +13,7 @@ import { MultiSelectAutocomplete } from '@/components/ui/multi-select-autocomple
 import StockMovementsTable from '@/components/movements/StockMovementsTable'
 import LowStockAlert from '@/components/movements/LowStockAlert'
 import { GoBack } from '@/components/shared/GoBack'
-import { Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, PackageMinus, History, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BulkItem {
@@ -27,51 +27,14 @@ function generateId() {
   return Math.random().toString(36).slice(2, 9)
 }
 
-function emptyBulkItem(): BulkItem {
-  return { id: generateId(), componenteId: '', cantidad: '1', notas: '' }
-}
-
-function CollapsibleCard({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string
-  open: boolean
-  onToggle: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <Card>
-      <CardHeader
-        className="flex flex-row items-center justify-between cursor-pointer select-none"
-        onClick={onToggle}
-      >
-        <CardTitle>{title}</CardTitle>
-        <ChevronDown
-          size={20}
-          className={cn('text-muted-foreground transition-transform', open && 'rotate-180')}
-        />
-      </CardHeader>
-      <div
-        className={cn(
-          'grid transition-all duration-200 ease-in-out',
-          open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-        )}
-      >
-        <div className="overflow-hidden">
-          <CardContent>{children}</CardContent>
-        </div>
-      </div>
-    </Card>
-  )
-}
+type TabKey = 'ingreso' | 'egreso' | 'historial'
 
 export default function IngresoStock() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const queryClient = useQueryClient()
+
+  const [activeTab, setActiveTab] = useState<TabKey>('ingreso')
 
   const [egresoComp, setEgresoComp] = useState('')
   const [egresoCant, setEgresoCant] = useState('1')
@@ -81,10 +44,6 @@ export default function IngresoStock() {
   const [bulkGlobalNotes, setBulkGlobalNotes] = useState('')
   const [bulkErrors, setBulkErrors] = useState<Record<number, string>>({})
   const [multiSelected, setMultiSelected] = useState<string[]>([])
-
-  const [openCards, setOpenCards] = useState<{ masivo: boolean }>({
-    masivo: true,
-  })
 
   const [movFilters, setMovFilters] = useState({ componenteId: '', tipo: '', page: 1 })
 
@@ -97,15 +56,33 @@ export default function IngresoStock() {
     queryFn: () => api.get('/componentes', { params: { limit: 1000 } }).then((r) => r.data),
   })
 
-  const { data: movData, isLoading: movLoading } = useQuery<{ data: StockMovement[]; pagination: Pagination }>({
+  const {
+    data: movData,
+    isLoading: movLoading,
+    isError: movError,
+    refetch: refetchMovimientos,
+  } = useQuery<{ data: StockMovement[]; pagination: Pagination }>({
     queryKey: ['movimientos', 'list', movFilters],
     queryFn: () => api.get('/stock/movimientos', { params: movFilters }).then((r) => r.data),
+    enabled: activeTab === 'historial',
   })
 
   const { data: resumenData } = useQuery<{ data: StockResumen }>({
     queryKey: ['stock-resumen'],
     queryFn: () => api.get('/stock/resumen').then((r) => r.data),
   })
+
+  useEffect(() => {
+    if (activeTab === 'historial') {
+      refetchMovimientos()
+    }
+  }, [activeTab, refetchMovimientos])
+
+  const componentMap = useMemo(() => {
+    const map = new Map<string, Componente>()
+    compData?.data.forEach((c) => map.set(c._id, c))
+    return map
+  }, [compData])
 
   const componentOptions = useMemo(
     () =>
@@ -127,13 +104,14 @@ export default function IngresoStock() {
     setBulkItems([])
     setBulkGlobalNotes('')
     setBulkErrors({})
+    setMultiSelected([])
   }
 
   const egresoMutation = useMutation({
     mutationFn: () => api.post('/stock/egreso', { componenteId: egresoComp, cantidad: Number(egresoCant), notas: egresoNotas || undefined }),
     onSuccess: () => {
       invalidateAll()
-      setSuccessMsg('✓ Egreso registrado correctamente')
+      setSuccessMsg('Egreso registrado correctamente')
       setErrorMsg('')
       setEgresoComp('')
       setEgresoCant('1')
@@ -158,7 +136,7 @@ export default function IngresoStock() {
       }),
     onSuccess: () => {
       invalidateAll()
-      setSuccessMsg(`✓ Lote de ${bulkItems.length} componente(s) cargado correctamente`)
+      setSuccessMsg(`Lote de ${bulkItems.length} componente(s) cargado correctamente`)
       setErrorMsg('')
       resetBulkIngreso()
       setTimeout(() => setSuccessMsg(''), 3000)
@@ -201,10 +179,6 @@ export default function IngresoStock() {
       })
       return next
     })
-  }
-
-  function addBulkItem() {
-    setBulkItems((prev) => [...prev, emptyBulkItem()])
   }
 
   function addMultiSelectedToBulk() {
@@ -255,180 +229,281 @@ export default function IngresoStock() {
     [bulkItems]
   )
 
+  function handleFilterComponentChange(val: string) {
+    setMovFilters((prev) => ({ ...prev, componenteId: val, page: 1 }))
+  }
+
+  function handleFilterTypeChange(val: string) {
+    setMovFilters((prev) => ({ ...prev, tipo: val, page: 1 }))
+  }
+
+  function clearMovFilters() {
+    setMovFilters({ componenteId: '', tipo: '', page: 1 })
+  }
+
+  const tabs: { key: TabKey; label: string; icon: React.ElementType; color?: string }[] = [
+    { key: 'ingreso', label: 'Ingreso', icon: Plus, color: 'text-green-600' },
+    { key: 'egreso', label: 'Egreso', icon: PackageMinus, color: 'text-destructive' },
+    { key: 'historial', label: 'Historial', icon: History },
+  ]
+
   return (
     <div className="space-y-6">
       <GoBack />
 
-      <CollapsibleCard
-        title="Cargar stock"
-        open={openCards.masivo}
-        onToggle={() => setOpenCards((prev) => ({ ...prev, masivo: !prev.masivo }))}
-      >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Buscar y seleccionar componentes</Label>
-            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
-              <div className="flex-1 w-full">
-                <MultiSelectAutocomplete
-                  options={componentOptions}
-                  selected={multiSelected}
-                  onChange={setMultiSelected}
-                  placeholder="Escribí para filtrar y marcá con checkbox..."
-                />
-              </div>
-              <Button
-                variant="outline"
-                className="w-full lg:w-auto whitespace-nowrap"
-                disabled={multiSelected.length === 0}
-                onClick={addMultiSelectedToBulk}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar {multiSelected.length > 0 ? `${multiSelected.length}` : ''}
-              </Button>
-            </div>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold tracking-tight">Movimientos de stock</h1>
+      </div>
 
-          {bulkItems.length > 0 && (
-            <div className="space-y-2">
-              {bulkItems.map((item, index) => (
-                <div key={item.id} className="flex flex-col lg:flex-row gap-2 items-start lg:items-end">
-                  <div className="flex-1 w-full">
-                    <Autocomplete
-                      options={componentOptions}
-                      value={item.componenteId}
-                      onChange={(value) => updateBulkItem(index, { componenteId: value })}
-                      placeholder="Buscar componente..."
-                    />
-                  </div>
-                  <div className="w-full lg:w-32">
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Cantidad"
-                      value={item.cantidad}
-                      onChange={(e) => updateBulkItem(index, { cantidad: e.target.value.replace(/\D/g, '') })}
-                    />
-                  </div>
-                  <div className="flex-1 w-full">
-                    <Input
-                      placeholder="Notas fila"
-                      value={item.notas}
-                      onChange={(e) => updateBulkItem(index, { notas: e.target.value })}
-                    />
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => removeBulkItem(index)} aria-label="Eliminar ítem">
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
-              {Object.entries(bulkErrors).map(([index, message]) => (
-                <p key={index} className="text-sm text-destructive">{message}</p>
-              ))}
-            </div>
-          )}
-
-          <Button variant="outline" className="w-full" onClick={addBulkItem}>
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar ítem
-          </Button>
-
-          <div className="space-y-2">
-            <Label>Notas generales del lote (opcional)</Label>
-            <Input
-              placeholder="ej. Remito N° 1234, proveedor..."
-              value={bulkGlobalNotes}
-              onChange={(e) => setBulkGlobalNotes(e.target.value)}
-            />
-          </div>
-
-          <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-            Total: <strong>{bulkItems.length}</strong> ítem(s) / <strong>{bulkTotalCantidad}</strong> unidades
-          </div>
-
-          <Button
-            className="w-full"
-            disabled={bulkItems.length === 0 || bulkIngresoMutation.isPending}
-            onClick={handleBulkSubmit}
-          >
-            {bulkIngresoMutation.isPending ? 'Cargando lote...' : 'Cargar lote'}
-          </Button>
-        </div>
-      </CollapsibleCard>
-
-      <Card>
-        <CardHeader><CardTitle>Egreso de stock</CardTitle></CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
-              <div className="flex-1 w-full">
-                <Label>Componente</Label>
-                <Autocomplete
-                  options={componentOptions}
-                  value={egresoComp}
-                  onChange={setEgresoComp}
-                  placeholder="Buscar componente..."
-                />
-              </div>
-              <div className="w-full lg:w-32">
-                <Label>Cantidad</Label>
-                <Input type="text" inputMode="numeric" value={egresoCant} onChange={(e) => setEgresoCant(e.target.value.replace(/\D/g, ''))} />
-              </div>
-              <div className="flex-1 w-full">
-                <Label>Motivo (opcional)</Label>
-                <Input placeholder="ej. Devolución, ajuste, consumo..." value={egresoNotas} onChange={(e) => setEgresoNotas(e.target.value)} />
-              </div>
-              <Button
-                className="w-full lg:w-auto whitespace-nowrap"
-                variant="destructive"
-                disabled={!egresoComp || Number(egresoCant) < 1 || egresoMutation.isPending}
-                onClick={() => setConfirmAction('egreso')}
-              >
-                {egresoMutation.isPending ? 'Procesando...' : 'Retirar stock'}
-              </Button>
-            </div>
-
-            {selectedEgreso && (
-              <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
-                <p>Stock actual: <strong>{selectedEgreso.stockActual}</strong> {selectedEgreso.unit}</p>
-                <p>Reservado: <strong>{selectedEgreso.stockReservado}</strong> {selectedEgreso.unit}</p>
-                <p>Disponible: <strong>{selectedEgreso.stockDisponible}</strong> {selectedEgreso.unit}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex border-b">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <tab.icon size={16} className={cn(isActive && tab.color)} />
+              <span className={cn(isActive && tab.color)}>{tab.label}</span>
+            </button>
+          )
+        })}
+      </div>
 
       {successMsg && (
-        <p className="text-sm text-green-600 text-center font-medium">{successMsg}</p>
+        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+          {successMsg}
+        </div>
       )}
       {errorMsg && (
-        <p className="text-sm text-destructive text-center font-medium">{errorMsg}</p>
+        <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
+          {errorMsg}
+        </div>
       )}
 
-      <Card>
-        <CardHeader><CardTitle>Historial de movimientos</CardTitle></CardHeader>
-        <CardContent>
-          <StockMovementsTable
-            movements={movData?.data ?? []}
-            loading={movLoading}
-            showNotes
-            showAuthor={isAdmin}
-            showFilters
-            showPagination
-            componentOptions={compData?.data}
-            filterComponentId={movFilters.componenteId}
-            filterType={movFilters.tipo}
-            pagination={movData?.pagination}
-            page={movFilters.page}
-            onFilterComponentChange={(val) => setMovFilters((prev) => ({ ...prev, componenteId: val, page: 1 }))}
-            onFilterTypeChange={(val) => setMovFilters((prev) => ({ ...prev, tipo: val, page: 1 }))}
-            onSearch={() => setMovFilters((prev) => ({ ...prev, page: 1 }))}
-            onPageChange={(page) => setMovFilters((prev) => ({ ...prev, page }))}
-          />
-        </CardContent>
-      </Card>
+      {activeTab === 'ingreso' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-600">
+                <Plus size={20} />
+                Ingreso de stock
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Buscar y seleccionar componentes</Label>
+                <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
+                  <div className="flex-1 w-full">
+                    <MultiSelectAutocomplete
+                      options={componentOptions}
+                      selected={multiSelected}
+                      onChange={setMultiSelected}
+                      placeholder="Escribí para filtrar y marcá con checkbox..."
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full lg:w-auto whitespace-nowrap"
+                    disabled={multiSelected.length === 0}
+                    onClick={addMultiSelectedToBulk}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar {multiSelected.length > 0 ? `${multiSelected.length}` : ''}
+                  </Button>
+                </div>
+              </div>
 
-      <LowStockAlert componentes={resumenData?.data?.componentes ?? []} />
+              {bulkItems.length > 0 && (
+                <div className="rounded-md border overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="text-left font-medium px-3 py-2">Componente</th>
+                        <th className="text-left font-medium px-3 py-2 w-32">Cantidad</th>
+                        <th className="text-left font-medium px-3 py-2">Notas</th>
+                        <th className="w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkItems.map((item, index) => {
+                        const comp = componentMap.get(item.componenteId)
+                        return (
+                          <tr key={item.id} className="border-t">
+                            <td className="px-3 py-2 align-top">
+                              <Autocomplete
+                                options={componentOptions}
+                                value={item.componenteId}
+                                onChange={(value) => updateBulkItem(index, { componenteId: value })}
+                                placeholder="Buscar componente..."
+                              />
+                              {comp && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Stock: <span className="font-medium text-foreground">{comp.stockActual}</span> {' '}
+                                  · Disp: <span className="font-medium text-foreground">{comp.stockDisponible}</span> {' '}
+                                  · Mín: <span className="font-medium text-foreground">{comp.stockMinimo}</span> {comp.unit}
+                                </p>
+                              )}
+                              {bulkErrors[index] && (
+                                <p className="text-xs text-destructive mt-1">{bulkErrors[index]}</p>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="Cantidad"
+                                value={item.cantidad}
+                                onChange={(e) => updateBulkItem(index, { cantidad: e.target.value.replace(/\D/g, '') })}
+                              />
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <Input
+                                placeholder="Notas fila"
+                                value={item.notas}
+                                onChange={(e) => updateBulkItem(index, { notas: e.target.value })}
+                              />
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                              <Button variant="ghost" size="icon" onClick={() => removeBulkItem(index)} aria-label="Eliminar ítem">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Notas generales del lote (opcional)</Label>
+                <Input
+                  placeholder="ej. Remito N° 1234, proveedor..."
+                  value={bulkGlobalNotes}
+                  onChange={(e) => setBulkGlobalNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-md border p-3">
+                <p className="text-sm text-muted-foreground">
+                  Total: <strong>{bulkItems.length}</strong> ítem(s) / <strong>{bulkTotalCantidad}</strong> unidades
+                </p>
+                <Button
+                  disabled={bulkItems.length === 0 || bulkIngresoMutation.isPending}
+                  onClick={handleBulkSubmit}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {bulkIngresoMutation.isPending ? 'Cargando lote...' : 'Cargar lote'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <LowStockAlert componentes={resumenData?.data?.componentes ?? []} />
+        </div>
+      )}
+
+      {activeTab === 'egreso' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <PackageMinus size={20} />
+              Egreso de stock
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
+                <div className="flex-1 w-full">
+                  <Label>Componente</Label>
+                  <Autocomplete
+                    options={componentOptions}
+                    value={egresoComp}
+                    onChange={setEgresoComp}
+                    placeholder="Buscar componente..."
+                  />
+                </div>
+                <div className="w-full lg:w-32">
+                  <Label>Cantidad</Label>
+                  <Input type="text" inputMode="numeric" value={egresoCant} onChange={(e) => setEgresoCant(e.target.value.replace(/\D/g, ''))} />
+                </div>
+                <div className="flex-1 w-full">
+                  <Label>Motivo (opcional)</Label>
+                  <Input placeholder="ej. Devolución, ajuste, consumo..." value={egresoNotas} onChange={(e) => setEgresoNotas(e.target.value)} />
+                </div>
+                <Button
+                  className="w-full lg:w-auto whitespace-nowrap"
+                  variant="destructive"
+                  disabled={!egresoComp || Number(egresoCant) < 1 || egresoMutation.isPending}
+                  onClick={() => setConfirmAction('egreso')}
+                >
+                  {egresoMutation.isPending ? 'Procesando...' : 'Retirar stock'}
+                </Button>
+              </div>
+
+              {selectedEgreso && (
+                <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
+                  <p>Stock actual: <strong>{selectedEgreso.stockActual}</strong> {selectedEgreso.unit}</p>
+                  <p>Reservado: <strong>{selectedEgreso.stockReservado}</strong> {selectedEgreso.unit}</p>
+                  <p>Disponible: <strong>{selectedEgreso.stockDisponible}</strong> {selectedEgreso.unit}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'historial' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History size={20} />
+              Historial de movimientos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {movError && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive mb-4">
+                Error al cargar el historial. Intentá recargar la página.
+              </div>
+            )}
+            <StockMovementsTable
+              movements={movData?.data ?? []}
+              loading={movLoading}
+              showNotes
+              showAuthor={isAdmin}
+              showFilters
+              showPagination
+              componentOptions={compData?.data}
+              filterComponentId={movFilters.componenteId}
+              filterType={movFilters.tipo}
+              pagination={movData?.pagination}
+              page={movFilters.page}
+              onFilterComponentChange={handleFilterComponentChange}
+              onFilterTypeChange={handleFilterTypeChange}
+              onSearch={() => setMovFilters((prev) => ({ ...prev, page: 1 }))}
+              onPageChange={(page) => setMovFilters((prev) => ({ ...prev, page }))}
+            />
+            {(movFilters.componenteId || movFilters.tipo) && (
+              <div className="mt-4 flex justify-end">
+                <Button variant="outline" size="sm" onClick={clearMovFilters}>
+                  <RotateCcw size={14} className="mr-2" />
+                  Limpiar filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
         <DialogHeader>
@@ -452,7 +527,9 @@ export default function IngresoStock() {
               if (confirmAction === 'bulk') bulkIngresoMutation.mutate()
               else egresoMutation.mutate()
             }}
-          >Confirmar</Button>
+          >
+            Confirmar
+          </Button>
         </div>
       </Dialog>
     </div>

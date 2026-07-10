@@ -71,7 +71,13 @@ export default function StockMovementsTable({
       {showFilters && (
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="w-full sm:w-48">
-            <Select value={filterComponentId ?? ''} onChange={(e) => onFilterComponentChange?.(e.target.value)}>
+            <Select
+              value={filterComponentId ?? ''}
+              onChange={(e) => {
+                onFilterComponentChange?.(e.target.value)
+                onSearch?.()
+              }}
+            >
               <option value="">Todos los componentes</option>
               {componentOptions?.map((c) => (
                 <option key={c._id} value={c._id}>{c.name}</option>
@@ -79,13 +85,21 @@ export default function StockMovementsTable({
             </Select>
           </div>
           <div className="w-full sm:w-36">
-            <Select value={filterType ?? ''} onChange={(e) => onFilterTypeChange?.(e.target.value)}>
+            <Select
+              value={filterType ?? ''}
+              onChange={(e) => {
+                onFilterTypeChange?.(e.target.value)
+                onSearch?.()
+              }}
+            >
               <option value="">Todos</option>
               <option value="ingreso">Ingreso</option>
               <option value="egreso">Egreso</option>
             </Select>
           </div>
-          <Button onClick={onSearch}><Search size={16} /> Buscar</Button>
+          {onSearch && (
+            <Button variant="outline" onClick={onSearch}><Search size={16} /> Buscar</Button>
+          )}
         </div>
       )}
 
