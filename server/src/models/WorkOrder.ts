@@ -13,12 +13,20 @@ export interface IWorkOrderItem {
   type: 'adicional' | 'repuesto';
 }
 
+export interface IWorkOrderStatusEntry {
+  status: WorkOrderStatus;
+  at: Date;
+  by?: Types.ObjectId;
+  notes?: string;
+}
+
 export interface IWorkOrder extends Document {
   sillas?: IWorkOrderSilla[];
   chairTypeId?: Types.ObjectId;
   quantity?: number;
   status: WorkOrderStatus;
   items?: IWorkOrderItem[];
+  statusHistory?: IWorkOrderStatusEntry[];
   createdBy?: Types.ObjectId;
   updatedBy?: Types.ObjectId;
   startedBy?: Types.ObjectId;
@@ -48,12 +56,27 @@ const workOrderItemSchema = new Schema<IWorkOrderItem>(
   { _id: false }
 );
 
+const workOrderStatusEntrySchema = new Schema<IWorkOrderStatusEntry>(
+  {
+    status: {
+      type: String,
+      required: true,
+      enum: ['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada'],
+    },
+    at: { type: Date, required: true },
+    by: { type: Schema.Types.ObjectId, ref: 'User' },
+    notes: { type: String, trim: true },
+  },
+  { _id: false }
+);
+
 const workOrderSchema = new Schema<IWorkOrder>(
   {
     sillas: { type: [workOrderSillaSchema] },
     chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: false, index: true },
     quantity: { type: Number, required: false, min: 1 },
     items: { type: [workOrderItemSchema] },
+    statusHistory: { type: [workOrderStatusEntrySchema] },
     status: {
       type: String,
       required: true,

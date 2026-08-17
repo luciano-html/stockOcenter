@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { ChairTypeWithBOM, ComponenteFiltros, Pagination, BomDetalleItem } from '@/types'
+import type { ChairTypeWithBOM, Pagination, BomDetalleItem } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,11 +18,8 @@ import { qtyWithUnit, cn } from '@/lib/utils'
 export default function TiposSillaList() {
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
-  const tipoFiltro = params.get('tipo') ?? ''
   const chairTipoFiltro = params.get('chairTipo') ?? ''
-  const subtipoFiltro = params.get('subtipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
-  const activeFiltro = params.get('active') ?? ''
   const page = Number(params.get('page') ?? '1')
   const sort = params.get('sort') ?? 'posibles'
   const order = params.get('order') ?? 'desc'
@@ -34,17 +31,14 @@ export default function TiposSillaList() {
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM[]; pagination: Pagination }>({
-    queryKey: ['tipos-silla', search, tipoFiltro, chairTipoFiltro, subtipoFiltro, marcaFiltro, activeFiltro, page, sort, order],
+    queryKey: ['tipos-silla', search, chairTipoFiltro, marcaFiltro, page, sort, order],
     queryFn: () =>
       api
         .get('/tipos-silla', {
           params: {
             q: search || undefined,
-            tipo: tipoFiltro || undefined,
             chairTipo: chairTipoFiltro || undefined,
-            subtipo: subtipoFiltro || undefined,
             marca: marcaFiltro || undefined,
-            active: activeFiltro || undefined,
             page,
             limit: 50,
             sort,
@@ -64,9 +58,14 @@ export default function TiposSillaList() {
     [tiposConteo]
   )
 
-  const { data: filtrosData } = useQuery<{ data: ComponenteFiltros }>({
-    queryKey: ['componentes-filtros'],
-    queryFn: () => api.get('/componentes/filtros').then((r) => r.data),
+  const { data: filtrosData } = useQuery<{ data: { subTipos: string[]; marcas: string[] } }>({
+    queryKey: ['tipos-silla-filtros', chairTipoFiltro],
+    queryFn: () =>
+      api
+        .get('/tipos-silla/filtros', {
+          params: { chairTipo: chairTipoFiltro || undefined },
+        })
+        .then((r) => r.data),
   })
 
   const deleteMutation = useMutation({
@@ -98,6 +97,19 @@ export default function TiposSillaList() {
     } else {
       next.delete(key)
     }
+    next.delete('page')
+    setParams(next, { replace: true })
+  }
+
+  function selectChairTipo(tipo: string) {
+    const next = new URLSearchParams(params)
+    if (tipo) {
+      next.set('chairTipo', tipo)
+    } else {
+      next.delete('chairTipo')
+    }
+    next.delete('subtipo')
+    next.delete('marca')
     next.delete('page')
     setParams(next, { replace: true })
   }
@@ -169,9 +181,8 @@ export default function TiposSillaList() {
                   <TableBody>
                     {bom.map((item) => {
                       const faltante = Math.max(0, item.quantity - item.stockDisponible)
-                      const componentId = item.componentId._id
                       return (
-                        <TableRow key={componentId}>
+                        <TableRow key={item.componentId._id}>
                           <TableCell className="font-medium">{item.componentId.name}</TableCell>
                           <TableCell>{qtyWithUnit(item.quantity, item.componentId.unit)}</TableCell>
                           <TableCell className="text-right text-muted-foreground">
@@ -187,8 +198,8 @@ export default function TiposSillaList() {
                           {isAdmin && (
                             <TableCell>
                               <div onClick={(e) => e.stopPropagation()}>
-                                <Link to={`/componentes/${componentId}`}>
-                                  <Button variant="ghost" size="icon" aria-label="Editar componente">
+                                <Link to={`/tipos-silla/${chairTypeId}/editar`}>
+                                  <Button variant="ghost" size="icon" aria-label="Cambiar componente en el tipo de silla">
                                     <Pencil size={16} />
                                   </Button>
                                 </Link>
@@ -241,7 +252,7 @@ export default function TiposSillaList() {
       <div className="flex border-b flex-wrap">
         <button
           type="button"
-          onClick={() => updateParam('chairTipo', '')}
+          onClick={() => selectChairTipo('')}
           className={cn(
             'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
             chairTipoFiltro === ''
@@ -259,7 +270,7 @@ export default function TiposSillaList() {
             <button
               key={t.tipo}
               type="button"
-              onClick={() => updateParam('chairTipo', t.tipo)}
+              onClick={() => selectChairTipo(t.tipo)}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
                 isActive
@@ -275,8 +286,8 @@ export default function TiposSillaList() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="relative sm:col-span-2 lg:col-span-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" size={16} />
           <Input
             placeholder="Buscar tipo de silla..."
@@ -285,32 +296,15 @@ export default function TiposSillaList() {
             onChange={(e) => updateParam('q', e.target.value)}
           />
         </div>
-        <Select value={tipoFiltro} onChange={(e) => updateParam('tipo', e.target.value)}>
-          <option value="">Todos los tipos</option>
-          {filtrosData?.data.tipos.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </Select>
-        <Select value={subtipoFiltro} onChange={(e) => updateParam('subtipo', e.target.value)}>
-          <option value="">Todos los sub-tipos</option>
-          {filtrosData?.data.subTipos.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </Select>
         <Select value={marcaFiltro} onChange={(e) => updateParam('marca', e.target.value)}>
           <option value="">Todas las marcas</option>
           {filtrosData?.data.marcas.map((m) => (
             <option key={m} value={m}>{m}</option>
           ))}
         </Select>
-        <Select value={activeFiltro} onChange={(e) => updateParam('active', e.target.value)}>
-          <option value="">Todos</option>
-          <option value="true">Activos</option>
-          <option value="false">Inactivos</option>
-        </Select>
       </div>
 
-      {(search || tipoFiltro || chairTipoFiltro || subtipoFiltro || marcaFiltro || activeFiltro) && (
+      {(search || chairTipoFiltro || marcaFiltro) && (
         <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
             Limpiar filtros

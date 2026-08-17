@@ -9,6 +9,7 @@ import type { Componente, ComponenteFiltros } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -22,6 +23,7 @@ const schema: z.ZodType<FormData, any, any> = z.object({
   marca: z.string().optional(),
   unit: z.string().min(1, 'Requerido'),
   stockMinimo: z.coerce.number().min(0, 'No puede ser negativo'),
+  tipoSilla: z.enum(['Giratoria', 'Fija', 'Ambas']),
 })
 
 type FormData = {
@@ -32,6 +34,7 @@ type FormData = {
   marca?: string
   unit: string
   stockMinimo: number
+  tipoSilla: 'Giratoria' | 'Fija' | 'Ambas'
 }
 
 export default function ComponenteForm() {
@@ -62,6 +65,7 @@ export default function ComponenteForm() {
       marca: data.data.marca,
       unit: data.data.unit,
       stockMinimo: data.data.stockMinimo,
+      tipoSilla: data.data.tipoSilla ?? 'Ambas',
     } : undefined,
   })
 
@@ -130,6 +134,16 @@ export default function ComponenteForm() {
               <p className="text-xs text-muted-foreground">Se marcará como stock bajo cuando el disponible sea menor o igual a este valor.</p>
               {errors.stockMinimo && <p className="text-xs text-destructive">{errors.stockMinimo.message}</p>}
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tipoSilla">Se usa en</Label>
+            <Select id="tipoSilla" {...register('tipoSilla')}>
+              <option value="Ambas">Fija y Giratoria</option>
+              <option value="Giratoria">Solo Giratoria</option>
+              <option value="Fija">Solo Fija</option>
+            </Select>
+            <p className="text-xs text-muted-foreground">Determina en qué tipo de silla (Fija o Giratoria) aparece este componente al armar la lista de materiales.</p>
+            {errors.tipoSilla && <p className="text-xs text-destructive">{errors.tipoSilla.message}</p>}
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <Button type="button" variant="outline" onClick={() => navigate('/componentes')}>Cancelar</Button>

@@ -11,6 +11,7 @@ export interface Componente {
   stockDisponible: number
   stockMinimo: number
   stockBajo: boolean
+  tipoSilla?: 'Giratoria' | 'Fija' | 'Ambas'
   createdAt: string
   updatedAt: string
 }
@@ -59,6 +60,13 @@ export interface WorkOrderSilla {
   quantity: number
 }
 
+export interface WorkOrderStatusHistoryEntry {
+  status: 'pendiente' | 'en_progreso' | 'pausada' | 'finalizada' | 'cancelada'
+  at: string
+  by?: { _id: string; name: string; role: string }
+  notes?: string
+}
+
 export interface WorkOrder {
   _id: string
   sillas?: WorkOrderSilla[]
@@ -66,6 +74,7 @@ export interface WorkOrder {
   quantity?: number
   status: 'pendiente' | 'en_progreso' | 'pausada' | 'finalizada' | 'cancelada'
   items?: { componentId: string; quantity: number; type: 'adicional' | 'repuesto' }[]
+  statusHistory?: WorkOrderStatusHistoryEntry[]
   createdBy?: { _id: string; name: string; role: string }
   updatedBy?: { _id: string; name: string; role: string }
   startedBy?: { _id: string; name: string; role: string }

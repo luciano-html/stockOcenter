@@ -41,6 +41,7 @@ export const finalizeWorkOrderSchema = z.object({
 
 export const updateStatusSchema = z.object({
   status: z.enum(['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada']),
+  notas: z.string().optional(),
 });
 
 export const assignWorkOrderSchema = z.object({

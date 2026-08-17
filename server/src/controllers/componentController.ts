@@ -90,12 +90,13 @@ export async function reservas(_req: Request, res: Response) {
 }
 
 export async function list(req: Request, res: Response) {
-  const { search, stockBajo, tipo, subtipo, marca, page, limit } = req.query as {
+  const { search, stockBajo, tipo, subtipo, marca, tipoSilla, page, limit } = req.query as {
     search?: string;
     stockBajo?: string;
     tipo?: string;
     subtipo?: string;
     marca?: string;
+    tipoSilla?: string;
     page?: string;
     limit?: string;
   };
@@ -113,6 +114,7 @@ export async function list(req: Request, res: Response) {
   if (tipo) filter.tipo = tipo;
   if (subtipo) filter.subtipo = subtipo;
   if (marca) filter.marca = marca;
+  if (tipoSilla) filter.tipoSilla = { $in: [tipoSilla, 'Ambas'] };
 
   const total = await Component.countDocuments(filter);
   const componentes = await Component.find(filter)
@@ -233,4 +235,56 @@ export async function filtros(req: Request, res: Response) {
       tiposCount: tiposCount.map((r) => ({ tipo: r._id, count: r.count })),
     },
   });
+}
+
+const ORDEN_TIPOS_GIRATORIA = [
+  'Rueda',
+  'Estrella',
+  'Cilindro',
+  'Chapon',
+  'Fuelle',
+  'Mecanismo',
+  'Espuma',
+  'Tapizado',
+  'Apoyabrazo',
+  'Apoyacabezas',
+  'Tornilleria',
+];
+
+export async function grupos(req: Request, res: Response) {
+  const { tipoSilla } = req.query as { tipoSilla?: string };
+
+  const scope: Record<string, unknown> = {};
+  if (tipoSilla === 'Giratoria' || tipoSilla === 'Fija') {
+    scope.tipoSilla = { $in: [tipoSilla, 'Ambas'] };
+  }
+
+  const componentes = await Component.find(scope).sort({ name: 1 }).lean();
+
+  const gruposMap = new Map<string, (typeof componentes)[number][]>();
+  for (const c of componentes) {
+    const tipo = (c.tipo ?? '').trim() || 'Otros';
+    if (!gruposMap.has(tipo)) gruposMap.set(tipo, []);
+    gruposMap.get(tipo)!.push(c);
+  }
+
+  const grupos = Array.from(gruposMap.entries()).map(([tipo, comps]) => ({
+    tipo,
+    componentes: comps.map((c) => ({
+      ...c,
+      stockDisponible: (c.stockActual ?? 0) - (c.stockReservado ?? 0),
+      stockBajo: (c.stockActual ?? 0) - (c.stockReservado ?? 0) <= (c.stockMinimo ?? 0),
+    })),
+  }));
+
+  grupos.sort((a, b) => {
+    const ia = ORDEN_TIPOS_GIRATORIA.indexOf(a.tipo);
+    const ib = ORDEN_TIPOS_GIRATORIA.indexOf(b.tipo);
+    if (ia !== -1 && ib !== -1) return ia - ib;
+    if (ia !== -1) return -1;
+    if (ib !== -1) return 1;
+    return a.tipo.localeCompare(b.tipo, 'es');
+  });
+
+  res.json({ data: grupos });
 }

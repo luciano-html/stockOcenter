@@ -13,7 +13,7 @@ import { getPagination, getSkip } from '../utils/pagination';
 import { createAuditLog } from '../services/auditService';
 
 const USER_POPULATE = {
-  path: 'createdBy updatedBy startedBy finalizedBy assignedTo',
+  path: 'createdBy updatedBy startedBy finalizedBy assignedTo statusHistory.by',
   select: 'name role',
 };
 
@@ -153,6 +153,7 @@ export async function create(req: Request, res: Response) {
     items: items ?? [],
     assignedTo: assignedTo ?? undefined,
     createdBy: req.user?.userId,
+    statusHistory: [{ status: 'pendiente', at: new Date(), by: req.user?.userId }],
   });
   const populated = await WorkOrder.findById(ot._id)
     .populate(CHAIR_POPULATE)
@@ -302,6 +303,13 @@ export async function finalizar(req: Request, res: Response) {
   ot.finalizedAt = new Date();
   ot.finalizedBy = req.user?.userId as any;
   ot.operatorNotes = notas?.trim() || undefined;
+  ot.statusHistory = ot.statusHistory ?? [];
+  ot.statusHistory.push({
+    status: 'finalizada',
+    at: new Date(),
+    by: req.user?.userId as any,
+    notes: notas?.trim() || undefined,
+  });
   await ot.save();
 
   const populated = await WorkOrder.findById(ot._id)
@@ -365,7 +373,7 @@ export async function asignar(req: Request, res: Response) {
 }
 
 export async function updateStatus(req: Request, res: Response) {
-  const { status } = req.body;
+  const { status, notas } = req.body;
   const ot = await WorkOrder.findById(req.params.id);
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
 
@@ -410,6 +418,16 @@ export async function updateStatus(req: Request, res: Response) {
   const previousStatus = ot.status;
 
   ot.status = status;
+  if (typeof notas === 'string') {
+    ot.operatorNotes = notas.trim() || undefined;
+  }
+  ot.statusHistory = ot.statusHistory ?? [];
+  ot.statusHistory.push({
+    status,
+    at: new Date(),
+    by: req.user?.userId as any,
+    notes: typeof notas === 'string' ? notas.trim() || undefined : undefined,
+  });
   ot.updatedBy = req.user?.userId as any;
   await ot.save();
 

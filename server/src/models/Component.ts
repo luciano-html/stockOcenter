@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type TipoSilla = 'Giratoria' | 'Fija' | 'Ambas';
+
 export interface IComponent extends Document {
   name: string;
   description?: string;
@@ -10,6 +12,7 @@ export interface IComponent extends Document {
   stockActual: number;
   stockReservado: number;
   stockMinimo: number;
+  tipoSilla?: TipoSilla;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,6 +28,7 @@ const componentSchema = new Schema<IComponent>(
     stockActual: { type: Number, required: true, default: 0, min: 0 },
     stockReservado: { type: Number, required: true, default: 0, min: 0 },
     stockMinimo: { type: Number, required: true, default: 0, min: 0 },
+    tipoSilla: { type: String, enum: ['Giratoria', 'Fija', 'Ambas'], index: true },
   },
   { timestamps: true }
 );

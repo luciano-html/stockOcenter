@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import LowStockAlert from '@/components/movements/LowStockAlert'
 import { cn } from '@/lib/utils'
-import { Plus, Package, AlertTriangle, ClipboardList, TrendingUp, Armchair, AlertCircle, ChevronDown } from 'lucide-react'
+import { Plus, Package, AlertTriangle, ClipboardList, TrendingUp, Armchair, AlertCircle, ChevronDown, User } from 'lucide-react'
 import StockMovementsTable from '@/components/movements/StockMovementsTable'
 import { getOrdenSillas, getOrdenSillasTotal } from '@/lib/ordenes'
 
@@ -37,6 +37,16 @@ function formatShortDate(dateString: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function getUltimaNota(ot: WorkOrder) {
+  const historico = ot.statusHistory
+  if (historico && historico.length > 0) {
+    for (let i = historico.length - 1; i >= 0; i--) {
+      if (historico[i].notes) return historico[i].notes
+    }
+  }
+  return ot.operatorNotes
 }
 
 function startOfToday() {
@@ -233,6 +243,17 @@ export default function Dashboard() {
                         ? 'Solo repuestos'
                         : getOrdenSillas(ot).map((s) => s.chairTypeId.name).join(', ')}
                     </p>
+                    {ot.assignedTo && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <User size={10} />
+                        {ot.assignedTo.name}
+                      </p>
+                    )}
+                    {getUltimaNota(ot) && (
+                      <p className="text-xs italic text-muted-foreground mt-0.5 line-clamp-2">
+                        "{getUltimaNota(ot)}"
+                      </p>
+                    )}
                     {status === 'finalizada' && ot.finalizedAt && (
                       <p className="text-xs text-muted-foreground mt-1">{formatShortDate(ot.finalizedAt)}</p>
                     )}
@@ -252,7 +273,7 @@ export default function Dashboard() {
           <CardTitle>Últimos movimientos</CardTitle>
         </CardHeader>
         <CardContent>
-          <StockMovementsTable movements={movimientosRecientes?.data ?? []} compact />
+          <StockMovementsTable movements={movimientosRecientes?.data ?? []} compact showNotes />
         </CardContent>
       </Card>
     </div>

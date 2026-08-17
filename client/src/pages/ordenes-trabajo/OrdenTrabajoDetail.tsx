@@ -67,33 +67,59 @@ function AuditInfo({ ot }: { ot: WorkOrder }) {
   )
 }
 
+const stepIcons: Record<string, typeof Clock> = {
+  pendiente: Calendar,
+  en_progreso: Play,
+  pausada: Pause,
+  finalizada: CheckCircle,
+  cancelada: XCircle,
+}
+
+const stepClass: Record<string, string> = {
+  pendiente: 'text-gray-500',
+  en_progreso: 'text-blue-600',
+  pausada: 'text-amber-600',
+  finalizada: 'text-green-600',
+  cancelada: 'text-destructive',
+}
+
 function OrderTimeline({ ot }: { ot: WorkOrder }) {
-  const steps: { label: string; icon: typeof Clock; date?: string; user?: { name: string; role: string }; active: boolean; className?: string }[] = [
-    {
-      label: 'Creada',
-      icon: Calendar,
-      date: ot.createdAt,
-      user: ot.createdBy,
-      active: true,
-      className: 'text-muted-foreground',
-    },
-    {
-      label: 'Iniciada',
-      icon: Play,
-      date: ot.startedAt,
-      user: ot.startedBy,
-      active: !!ot.startedAt,
-      className: 'text-blue-600',
-    },
-    {
-      label: ot.status === 'cancelada' ? 'Cancelada' : 'Finalizada',
-      icon: ot.status === 'cancelada' ? XCircle : CheckCircle,
-      date: ot.finalizedAt,
-      user: ot.finalizedBy,
-      active: ot.status === 'finalizada' || ot.status === 'cancelada',
-      className: ot.status === 'cancelada' ? 'text-destructive' : 'text-green-600',
-    },
-  ]
+  const steps = ot.statusHistory && ot.statusHistory.length > 0
+    ? ot.statusHistory.map((e) => ({
+        label: statusLabels[e.status],
+        icon: stepIcons[e.status] ?? Clock,
+        date: e.at,
+        user: e.by,
+        notes: e.notes,
+        active: true,
+        className: stepClass[e.status] ?? 'text-muted-foreground',
+      }))
+    : [
+        {
+          label: 'Creada',
+          icon: Calendar,
+          date: ot.createdAt,
+          user: ot.createdBy,
+          active: true,
+          className: 'text-muted-foreground',
+        },
+        {
+          label: 'Iniciada',
+          icon: Play,
+          date: ot.startedAt,
+          user: ot.startedBy,
+          active: !!ot.startedAt,
+          className: 'text-blue-600',
+        },
+        {
+          label: ot.status === 'cancelada' ? 'Cancelada' : 'Finalizada',
+          icon: ot.status === 'cancelada' ? XCircle : CheckCircle,
+          date: ot.finalizedAt,
+          user: ot.finalizedBy,
+          active: ot.status === 'finalizada' || ot.status === 'cancelada',
+          className: ot.status === 'cancelada' ? 'text-destructive' : 'text-green-600',
+        },
+      ]
 
   return (
     <div className="space-y-4">
@@ -123,6 +149,11 @@ function OrderTimeline({ ot }: { ot: WorkOrder }) {
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <User size={10} />
                     {step.user.name} ({step.user.role})
+                  </p>
+                )}
+                {step.notes && (
+                  <p className="text-xs mt-1 bg-amber-50 text-amber-900 border border-amber-200 rounded px-2 py-1">
+                    {step.notes}
                   </p>
                 )}
               </div>
@@ -158,8 +189,8 @@ export default function OrdenTrabajoDetail() {
   })
 
   const mutation = useMutation({
-    mutationFn: ({ status, notes }: { status: string; notes?: string }) =>
-      api.patch(`/ordenes-trabajo/${id}/estado`, { status, notes }),
+    mutationFn: ({ status, notas }: { status: string; notas?: string }) =>
+      api.patch(`/ordenes-trabajo/${id}/estado`, { status, notas }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orden-trabajo', id] })
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
@@ -167,6 +198,7 @@ export default function OrdenTrabajoDetail() {
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo-dash'] })
       queryClient.invalidateQueries({ queryKey: ['movimientos-recent'] })
       setConfirmStatus(null)
+      setStatusNotes('')
       setStockError(null)
     },
     onError: (err: AxiosErrorType) => {
@@ -207,7 +239,7 @@ export default function OrdenTrabajoDetail() {
 
   function handleConfirm() {
     if (!confirmStatus) return
-    const startFlow = () => mutation.mutate({ status: confirmStatus, notes: statusNotes || undefined })
+    const startFlow = () => mutation.mutate({ status: confirmStatus, notas: statusNotes || undefined })
     if (confirmStatus === 'en_progreso' && !ot.assignedTo && selectedOperator) {
       assignMutation.mutate({ assignedTo: selectedOperator }, { onSuccess: startFlow })
     } else {

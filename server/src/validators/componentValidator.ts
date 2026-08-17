@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { objectIdSchema } from './common';
 
+const tipoSillaSchema = z.enum(['Giratoria', 'Fija', 'Ambas']);
+
 export const createComponentSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').trim(),
   description: z.string().trim().optional(),
@@ -9,6 +11,7 @@ export const createComponentSchema = z.object({
   marca: z.string().trim().optional(),
   unit: z.string().min(1, 'La unidad es requerida').trim(),
   stockMinimo: z.number().min(0, 'El stock mínimo no puede ser negativo').default(0),
+  tipoSilla: tipoSillaSchema.optional(),
 });
 
 export const updateComponentSchema = z.object({
@@ -20,6 +23,7 @@ export const updateComponentSchema = z.object({
   unit: z.string().min(1, 'La unidad es requerida').trim().optional(),
   stockActual: z.number().min(0, 'El stock actual no puede ser negativo').optional(),
   stockMinimo: z.number().min(0, 'El stock mínimo no puede ser negativo').optional(),
+  tipoSilla: tipoSillaSchema.optional(),
 });
 
 export const componentParamsSchema = z.object({
@@ -32,6 +36,7 @@ export const listComponentsQuerySchema = z.object({
   tipo: z.string().trim().optional(),
   subtipo: z.string().trim().optional(),
   marca: z.string().trim().optional(),
+  tipoSilla: z.string().trim().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(1000).default(50),
 });

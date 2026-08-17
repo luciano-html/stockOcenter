@@ -20,7 +20,6 @@ export default function ComponentesList() {
   const search = params.get('q') ?? ''
   const tipoFiltro = params.get('tipo') ?? ''
   const subtipoFiltro = params.get('subtipo') ?? ''
-  const marcaFiltro = params.get('marca') ?? ''
   const stockBajoFiltro = params.get('stockBajo') === 'true'
   const page = Number(params.get('page') ?? '1')
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -30,13 +29,12 @@ export default function ComponentesList() {
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: Componente[]; pagination: Pagination }>({
-    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, marcaFiltro, stockBajoFiltro, page],
+    queryKey: ['componentes', search, tipoFiltro, subtipoFiltro, stockBajoFiltro, page],
     queryFn: () => api.get('/componentes', {
       params: {
         search: search || undefined,
         tipo: tipoFiltro || undefined,
         subtipo: subtipoFiltro || undefined,
-        marca: marcaFiltro || undefined,
         stockBajo: stockBajoFiltro || undefined,
         page,
         limit: 50,
@@ -45,12 +43,10 @@ export default function ComponentesList() {
   })
 
   const { data: filtrosData } = useQuery<{ data: ComponenteFiltros }>({
-    queryKey: ['componentes-filtros', tipoFiltro, subtipoFiltro, marcaFiltro],
+    queryKey: ['componentes-filtros', tipoFiltro],
     queryFn: () => api.get('/componentes/filtros', {
       params: {
         tipo: tipoFiltro || undefined,
-        subtipo: subtipoFiltro || undefined,
-        marca: marcaFiltro || undefined,
       },
     }).then((r) => r.data),
   })
@@ -163,8 +159,8 @@ export default function ComponentesList() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="relative sm:col-span-2 lg:col-span-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" size={16} />
           <Input placeholder="Buscar componente..." className="pl-9" value={search} onChange={(e) => {
             const next = new URLSearchParams(params)
@@ -173,15 +169,6 @@ export default function ComponentesList() {
             setParams(next, { replace: true })
           }} />
         </div>
-        <Select value={tipoFiltro} onChange={(e) => {
-          const next = new URLSearchParams(params)
-          e.target.value ? next.set('tipo', e.target.value) : next.delete('tipo')
-          next.delete('page')
-          setParams(next, { replace: true })
-        }}>
-          <option value="">Todos los tipos</option>
-          {filtrosData?.data.tipos.map((t) => <option key={t} value={t}>{t}</option>)}
-        </Select>
         <Select value={subtipoFiltro} onChange={(e) => {
           const next = new URLSearchParams(params)
           e.target.value ? next.set('subtipo', e.target.value) : next.delete('subtipo')
@@ -190,15 +177,6 @@ export default function ComponentesList() {
         }}>
           <option value="">Todos los sub-tipos</option>
           {filtrosData?.data.subTipos.map((s) => <option key={s} value={s}>{s}</option>)}
-        </Select>
-        <Select value={marcaFiltro} onChange={(e) => {
-          const next = new URLSearchParams(params)
-          e.target.value ? next.set('marca', e.target.value) : next.delete('marca')
-          next.delete('page')
-          setParams(next, { replace: true })
-        }}>
-          <option value="">Todas las marcas</option>
-          {filtrosData?.data.marcas.map((m) => <option key={m} value={m}>{m}</option>)}
         </Select>
         <div className="flex gap-2">
           <Button
@@ -218,7 +196,7 @@ export default function ComponentesList() {
         </div>
       </div>
 
-      {(search || tipoFiltro || subtipoFiltro || marcaFiltro || stockBajoFiltro) && (
+      {(search || tipoFiltro || subtipoFiltro || stockBajoFiltro) && (
         <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={clearFilters}>
             Limpiar filtros

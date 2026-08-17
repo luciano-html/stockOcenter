@@ -9,6 +9,7 @@ import {
   chairTypeParamsSchema,
   listChairTypesQuerySchema,
   bomsQuerySchema,
+  filtrosQuerySchema,
 } from '../validators/chairTypeValidator';
 
 const router = Router();
@@ -17,6 +18,7 @@ router.use(authenticate);
 
 router.get('/', validate(listChairTypesQuerySchema, 'query'), chairTypeController.list);
 router.get('/tipos', chairTypeController.tipos);
+router.get('/filtros', validate(filtrosQuerySchema, 'query'), chairTypeController.filtros);
 router.get('/imagenes/preview', authorize('admin'), chairTypeController.previewImageMatches);
 router.post('/imagenes/vincular', authorize('admin'), chairTypeController.applyImageMatchesController);
 router.post('/imagenes/upload', authorize('admin'), uploadImage, chairTypeController.uploadImage);

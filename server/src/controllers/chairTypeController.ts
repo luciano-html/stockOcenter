@@ -110,6 +110,35 @@ export async function tipos(_req: Request, res: Response) {
   res.json({ data: result.map((r) => ({ tipo: r._id, count: r.count })) });
 }
 
+export async function filtros(req: Request, res: Response) {
+  const { chairTipo } = req.query as { chairTipo?: string };
+
+  const sillas = await ChairType.find(chairTipo ? { tipo: chairTipo } : {}).select('_id').lean();
+  const sillaIds = sillas.map((s) => s._id);
+  if (sillaIds.length === 0) {
+    res.json({ data: { subTipos: [], marcas: [] } });
+    return;
+  }
+
+  const distinct = async (field: 'subtipo' | 'marca') =>
+    BOMItem.aggregate([
+      { $match: { chairTypeId: { $in: sillaIds } } },
+      { $lookup: { from: 'components', localField: 'componentId', foreignField: '_id', as: 'comp' } },
+      { $unwind: '$comp' },
+      { $match: { [`comp.${field}`]: { $nin: [null, ''] } } },
+      { $group: { _id: `$comp.${field}` } },
+      { $sort: { _id: 1 } },
+    ]);
+
+  const [subTipos, marcas] = await Promise.all([distinct('subtipo'), distinct('marca')]);
+  res.json({
+    data: {
+      subTipos: subTipos.map((r) => r._id),
+      marcas: marcas.map((r) => r._id),
+    },
+  });
+}
+
 export async function boms(req: Request, res: Response) {
   const { ids } = req.query as { ids?: string };
   const chairTypeIds = (ids ?? '')

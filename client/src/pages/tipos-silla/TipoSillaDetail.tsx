@@ -135,7 +135,7 @@ export default function TipoSillaDetail() {
                     : item.componentId
                   const compIdString = typeof item.componentId === 'string'
                     ? item.componentId
-                    : item.componentId._id
+                    : (item.componentId?._id ?? '')
                   return (
                     <TableRow key={item._id} className={!comp ? 'bg-amber-50' : undefined}>
                       <TableCell className="font-medium">
@@ -146,7 +146,9 @@ export default function TipoSillaDetail() {
                         ) : (
                           <span className="text-amber-700">
                             Componente no encontrado
-                            <span className="font-mono text-xs text-muted-foreground ml-1">({compIdString})</span>
+                            {compIdString && (
+                              <span className="font-mono text-xs text-muted-foreground ml-1">({compIdString})</span>
+                            )}
                           </span>
                         )}
                       </TableCell>

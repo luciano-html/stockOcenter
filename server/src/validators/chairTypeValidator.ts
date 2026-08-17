@@ -42,3 +42,7 @@ export const listChairTypesQuerySchema = z.object({
 export const bomsQuerySchema = z.object({
   ids: z.string().trim().min(1, 'Se requieren ids de tipos de silla'),
 });
+
+export const filtrosQuerySchema = z.object({
+  chairTipo: z.string().trim().optional(),
+});
