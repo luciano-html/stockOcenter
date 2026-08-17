@@ -7,6 +7,7 @@ import {
   updateWorkOrderSchema,
   finalizeWorkOrderSchema,
   updateStatusSchema,
+  assignWorkOrderSchema,
   workOrderParamsSchema,
   listWorkOrdersQuerySchema,
 } from '../validators/workOrderValidator';
@@ -16,6 +17,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', validate(listWorkOrdersQuerySchema, 'query'), workOrderController.list);
+router.get('/counts', workOrderController.counts);
 router.get('/:id', validate(workOrderParamsSchema, 'params'), workOrderController.getById);
 router.get('/:id/detalle', validate(workOrderParamsSchema, 'params'), workOrderController.getDetalle);
 router.post('/', authorize('admin'), validate(createWorkOrderSchema), workOrderController.create);
@@ -39,6 +41,13 @@ router.patch(
   validate(workOrderParamsSchema, 'params'),
   validate(updateStatusSchema),
   workOrderController.updateStatus
+);
+router.patch(
+  '/:id/asignar',
+  authorize('admin'),
+  validate(workOrderParamsSchema, 'params'),
+  validate(assignWorkOrderSchema),
+  workOrderController.asignar
 );
 
 export default router;

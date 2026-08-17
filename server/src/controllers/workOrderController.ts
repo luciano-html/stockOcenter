@@ -1,14 +1,63 @@
 import { Request, Response } from 'express';
-import { WorkOrder, BOMItem } from '../models';
+import { WorkOrder, BOMItem, ChairType, User } from '../models';
 import { ApiError } from '../utils/ApiError';
-import { canTransition, reservarStock, descontarStock, liberarReserva } from '../services/workOrderService';
+import {
+  canTransition,
+  reservarStock,
+  descontarStock,
+  liberarReserva,
+  resolveSillas,
+  SillaReq,
+} from '../services/workOrderService';
 import { getPagination, getSkip } from '../utils/pagination';
 import { createAuditLog } from '../services/auditService';
 
 const USER_POPULATE = {
-  path: 'createdBy updatedBy startedBy finalizedBy',
+  path: 'createdBy updatedBy startedBy finalizedBy assignedTo',
   select: 'name role',
 };
+
+const CHAIR_POPULATE = [
+  { path: 'sillas.chairTypeId', select: 'name' },
+  { path: 'chairTypeId', select: 'name' },
+];
+
+function sillasFromBody(body: Record<string, unknown>): SillaReq[] {
+  return ((body.sillas as SillaReq[]) ?? []).map((s) => ({
+    chairTypeId: s.chairTypeId,
+    quantity: Number(s.quantity),
+  }));
+}
+
+function getSillasNames(ot: {
+  sillas?: { chairTypeId: { _id: string; name: string } | string; quantity: number }[];
+  chairTypeId?: { _id: string; name: string } | string | null;
+  quantity?: number;
+}): string[] {
+  if (ot.sillas && ot.sillas.length > 0) {
+    return ot.sillas.map((s) => {
+      const name = typeof s.chairTypeId === 'object' ? s.chairTypeId.name : 'Silla';
+      return `${name} x${s.quantity}`;
+    });
+  }
+  if (ot.chairTypeId) {
+    const name = typeof ot.chairTypeId === 'object' ? ot.chairTypeId.name : 'Silla';
+    return [`${name} x${ot.quantity ?? 1}`];
+  }
+  return [];
+}
+
+const STATUS_KEYS = ['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada'] as const;
+
+export async function counts(_req: Request, res: Response) {
+  const result = await WorkOrder.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]);
+  const counts: Record<string, number> = {};
+  for (const key of STATUS_KEYS) counts[key] = 0;
+  for (const r of result) {
+    if (typeof r._id === 'string' && r._id in counts) counts[r._id] = r.count;
+  }
+  res.json({ data: counts });
+}
 
 export async function list(req: Request, res: Response) {
   const { estado, page, limit } = req.query as { estado?: string; page?: string; limit?: string };
@@ -20,7 +69,7 @@ export async function list(req: Request, res: Response) {
 
   const [ordenes, total] = await Promise.all([
     WorkOrder.find(filter)
-      .populate('chairTypeId', 'name')
+      .populate(CHAIR_POPULATE)
       .populate(USER_POPULATE)
       .sort({ createdAt: -1 })
       .skip(getSkip(pageNum, limitNum))
@@ -34,7 +83,7 @@ export async function list(req: Request, res: Response) {
 
 export async function getById(req: Request, res: Response) {
   const ot = await WorkOrder.findById(req.params.id)
-    .populate('chairTypeId', 'name')
+    .populate(CHAIR_POPULATE)
     .populate(USER_POPULATE)
     .lean();
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
@@ -43,28 +92,51 @@ export async function getById(req: Request, res: Response) {
 
 export async function getDetalle(req: Request, res: Response) {
   const ot = await WorkOrder.findById(req.params.id)
-    .populate('chairTypeId', 'name')
+    .populate(CHAIR_POPULATE)
     .populate(USER_POPULATE)
+    .populate('items.componentId', 'name unit tipo subtipo marca')
     .lean();
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
 
-  const bom = ot.chairTypeId
-    ? (
-        await BOMItem.find({ chairTypeId: (ot.chairTypeId as unknown as { _id: string })._id })
-          .populate('componentId', 'name unit tipo subtipo marca')
-          .lean()
-      ).map((item) => ({
-        componentId: item.componentId,
-        quantity: item.quantity * ot.quantity,
-        unit: (item.componentId as unknown as { unit: string })?.unit ?? '',
-        tipo: 'bom',
-      }))
-    : [];
+  const sillas = resolveSillas(
+    ot.sillas?.map((s) => ({
+      chairTypeId: (s.chairTypeId as unknown as { _id: string })._id?.toString() ?? s.chairTypeId.toString(),
+      quantity: s.quantity,
+    })),
+    (ot.chairTypeId as unknown as { _id?: string })?._id?.toString() ?? ot.chairTypeId?.toString(),
+    ot.quantity
+  );
+
+  let bom: Array<Record<string, unknown>> = [];
+
+  if (sillas.length > 0) {
+    const bomItems = await BOMItem.find({ chairTypeId: { $in: sillas.map((s) => s.chairTypeId) } })
+      .populate('componentId', 'name unit tipo subtipo marca')
+      .lean();
+
+    const bomMap = new Map<string, typeof bomItems>();
+    for (const item of bomItems) {
+      const key = (item.chairTypeId as unknown as { _id: string })._id.toString();
+      if (!bomMap.has(key)) bomMap.set(key, []);
+      bomMap.get(key)!.push(item);
+    }
+
+    for (const silla of sillas) {
+      for (const item of bomMap.get(silla.chairTypeId) ?? []) {
+        bom.push({
+          componentId: item.componentId,
+          quantity: item.quantity * silla.quantity,
+          unit: (item.componentId as unknown as { unit: string })?.unit ?? '',
+          tipo: 'bom',
+        });
+      }
+    }
+  }
 
   const extraItems = (ot.items ?? []).map((i) => ({
     componentId: i.componentId,
     quantity: i.quantity,
-    unit: '',
+    unit: (i.componentId as unknown as { unit: string })?.unit ?? '',
     tipo: i.type,
   }));
 
@@ -72,15 +144,18 @@ export async function getDetalle(req: Request, res: Response) {
 }
 
 export async function create(req: Request, res: Response) {
-  const { chairTypeId, quantity, items } = req.body;
+  const { chairTypeId, quantity, items, assignedTo } = req.body;
+  const sillas = sillasFromBody(req.body);
   const ot = await WorkOrder.create({
+    sillas: sillas.length > 0 ? sillas : undefined,
     chairTypeId,
     quantity,
     items: items ?? [],
+    assignedTo: assignedTo ?? undefined,
     createdBy: req.user?.userId,
   });
   const populated = await WorkOrder.findById(ot._id)
-    .populate('chairTypeId', 'name')
+    .populate(CHAIR_POPULATE)
     .populate(USER_POPULATE)
     .lean();
 
@@ -92,8 +167,8 @@ export async function create(req: Request, res: Response) {
     description: `Creación de OT #${ot._id.toString().slice(-6)}`,
     metadata: {
       orderId: ot._id,
+      sillas: getSillasNames(populated as never),
       chairTypeId: chairTypeId,
-      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
       quantity,
     },
     req,
@@ -103,7 +178,8 @@ export async function create(req: Request, res: Response) {
 }
 
 export async function update(req: Request, res: Response) {
-  const { chairTypeId, quantity, items } = req.body;
+  const { chairTypeId, quantity, items, assignedTo } = req.body;
+  const sillas = sillasFromBody(req.body);
   const ot = await WorkOrder.findById(req.params.id);
   if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
 
@@ -111,14 +187,16 @@ export async function update(req: Request, res: Response) {
     throw ApiError.badRequest('Solo se pueden editar órdenes en estado pendiente');
   }
 
+  ot.sillas = sillas.length > 0 ? (sillas as never) : undefined;
   ot.chairTypeId = chairTypeId ?? undefined;
-  ot.quantity = quantity;
+  ot.quantity = quantity ?? undefined;
   ot.items = items ?? [];
+  ot.assignedTo = assignedTo ?? undefined;
   ot.updatedBy = req.user?.userId as any;
   await ot.save();
 
   const populated = await WorkOrder.findById(ot._id)
-    .populate('chairTypeId', 'name')
+    .populate(CHAIR_POPULATE)
     .populate(USER_POPULATE)
     .lean();
 
@@ -130,8 +208,8 @@ export async function update(req: Request, res: Response) {
     description: `Edición de OT #${ot._id.toString().slice(-6)}`,
     metadata: {
       orderId: ot._id,
+      sillas: getSillasNames(populated as never),
       chairTypeId: chairTypeId ?? ot.chairTypeId,
-      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
       quantity,
     },
     req,
@@ -149,14 +227,33 @@ export async function finalizar(req: Request, res: Response) {
     throw ApiError.badRequest('La orden no puede ser finalizada en su estado actual');
   }
 
+  const sillas = resolveSillas(
+    ot.sillas?.map((s) => ({ chairTypeId: s.chairTypeId.toString(), quantity: s.quantity })),
+    ot.chairTypeId?.toString(),
+    ot.quantity
+  );
+
   // Calcular ítems esperados
-  const bom = ot.chairTypeId
-    ? (await BOMItem.find({ chairTypeId: ot.chairTypeId.toString() }).lean()).map((item) => ({
-        componentId: item.componentId.toString(),
-        quantity: item.quantity * ot.quantity,
-        tipo: 'bom' as const,
-      }))
-    : [];
+  let bom: Array<{ componentId: string; quantity: number; tipo: 'bom' }> = [];
+
+  if (sillas.length > 0) {
+    const bomItems = await BOMItem.find({ chairTypeId: { $in: sillas.map((s) => s.chairTypeId) } }).lean();
+    const bomMap = new Map<string, typeof bomItems>();
+    for (const item of bomItems) {
+      const key = item.chairTypeId.toString();
+      if (!bomMap.has(key)) bomMap.set(key, []);
+      bomMap.get(key)!.push(item);
+    }
+    for (const silla of sillas) {
+      for (const item of bomMap.get(silla.chairTypeId) ?? []) {
+        bom.push({
+          componentId: item.componentId.toString(),
+          quantity: item.quantity * silla.quantity,
+          tipo: 'bom',
+        });
+      }
+    }
+  }
 
   const extraItems = (ot.items ?? []).map((i) => ({
     componentId: (i.componentId as any).toString?.() ?? i.componentId,
@@ -186,7 +283,7 @@ export async function finalizar(req: Request, res: Response) {
 
   // Si estaba pendiente, reservar stock antes de descontar
   if (ot.status === 'pendiente') {
-    await reservarStock(ot.chairTypeId?.toString(), ot.quantity, ot.items);
+    await reservarStock(sillas, ot.items);
     if (!ot.startedBy) {
       ot.startedBy = req.user?.userId as any;
       ot.startedAt = new Date();
@@ -194,8 +291,7 @@ export async function finalizar(req: Request, res: Response) {
   }
 
   await descontarStock(
-    ot.chairTypeId?.toString(),
-    ot.quantity,
+    sillas,
     ot._id.toString(),
     ot.items,
     req.user?.userId,
@@ -209,7 +305,7 @@ export async function finalizar(req: Request, res: Response) {
   await ot.save();
 
   const populated = await WorkOrder.findById(ot._id)
-    .populate('chairTypeId', 'name')
+    .populate(CHAIR_POPULATE)
     .populate(USER_POPULATE)
     .lean();
 
@@ -221,9 +317,46 @@ export async function finalizar(req: Request, res: Response) {
     description: `Finalización de OT #${ot._id.toString().slice(-6)}`,
     metadata: {
       orderId: ot._id,
-      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
+      sillas: getSillasNames(populated as never),
       quantity: ot.quantity,
       notas,
+    },
+    req,
+  });
+
+  res.json({ data: populated });
+}
+
+export async function asignar(req: Request, res: Response) {
+  const { assignedTo } = req.body;
+  const ot = await WorkOrder.findById(req.params.id);
+  if (!ot) throw ApiError.notFound('Orden de trabajo no encontrada');
+
+  ot.assignedTo = assignedTo ?? undefined;
+  ot.updatedBy = req.user?.userId as any;
+  await ot.save();
+
+  const populated = await WorkOrder.findById(ot._id)
+    .populate(CHAIR_POPULATE)
+    .populate(USER_POPULATE)
+    .lean();
+
+  const assignedUser = assignedTo ? await User.findById(assignedTo).lean() : null;
+  const assignedName = assignedUser ? (assignedUser.name || assignedUser.username) : null;
+
+  await createAuditLog({
+    action: 'work_order_assigned',
+    severity: 'info',
+    userId: req.user?.userId,
+    userRole: req.user?.role,
+    description: assignedTo
+      ? `OT #${ot._id.toString().slice(-6)} asignada a "${assignedName}"`
+      : `OT #${ot._id.toString().slice(-6)} sin asignar`,
+    metadata: {
+      orderId: ot._id,
+      sillas: getSillasNames(populated as never),
+      assignedTo: assignedTo ?? null,
+      assignedName,
     },
     req,
   });
@@ -240,10 +373,16 @@ export async function updateStatus(req: Request, res: Response) {
     throw ApiError.badRequest(`No se puede pasar de "${ot.status}" a "${status}"`);
   }
 
+  const sillas = resolveSillas(
+    ot.sillas?.map((s) => ({ chairTypeId: s.chairTypeId.toString(), quantity: s.quantity })),
+    ot.chairTypeId?.toString(),
+    ot.quantity
+  );
+
   switch (status) {
     case 'en_progreso':
       if (ot.status === 'pendiente') {
-        await reservarStock(ot.chairTypeId?.toString(), ot.quantity, ot.items);
+        await reservarStock(sillas, ot.items);
       }
       if (!ot.startedBy) {
         ot.startedBy = req.user?.userId as any;
@@ -252,8 +391,7 @@ export async function updateStatus(req: Request, res: Response) {
       break;
     case 'finalizada':
       await descontarStock(
-        ot.chairTypeId?.toString(),
-        ot.quantity,
+        sillas,
         ot._id.toString(),
         ot.items,
         req.user?.userId,
@@ -264,7 +402,7 @@ export async function updateStatus(req: Request, res: Response) {
       break;
     case 'cancelada':
       if (ot.status === 'en_progreso' || ot.status === 'pausada') {
-        await liberarReserva(ot.chairTypeId?.toString(), ot.quantity, ot.items);
+        await liberarReserva(sillas, ot.items);
       }
       break;
   }
@@ -276,7 +414,7 @@ export async function updateStatus(req: Request, res: Response) {
   await ot.save();
 
   const populated = await WorkOrder.findById(ot._id)
-    .populate('chairTypeId', 'name')
+    .populate(CHAIR_POPULATE)
     .populate(USER_POPULATE)
     .lean();
 
@@ -288,7 +426,7 @@ export async function updateStatus(req: Request, res: Response) {
     description: `Cambio de estado en OT #${ot._id.toString().slice(-6)}: ${previousStatus} → ${status}`,
     metadata: {
       orderId: ot._id,
-      chairTypeName: (populated?.chairTypeId as unknown as { name?: string })?.name,
+      sillas: getSillasNames(populated as never),
       previousStatus,
       newStatus: status,
     },

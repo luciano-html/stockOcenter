@@ -68,25 +68,37 @@ export async function calcularSillasPosiblesConDetalle(chairTypeId: string) {
     },
   ]);
 
-  if (!items.length) return { sillasPosibles: 0, limitante: null };
+  if (!items.length) return { sillasPosibles: 0, limitante: null, faltantes: [] };
 
   let minSillas = Infinity;
-  let limitante: { name: string; stockDisponible: number; necesario: number } | null = null;
+  let limitante: { name: string; unit?: string; stockDisponible: number; necesario: number } | null = null;
 
   for (const item of items) {
     if (item.posibles < minSillas) {
       minSillas = item.posibles;
       limitante = {
         name: item.name,
+        unit: item.unit,
         stockDisponible: item.disponible,
         necesario: item.quantity,
       };
     }
   }
 
+  const faltantes = items
+    .filter((item) => item.posibles < 1)
+    .map((item) => ({
+      name: item.name,
+      unit: item.unit,
+      disponible: item.disponible,
+      necesario: item.quantity,
+      faltante: Math.max(0, item.quantity - item.disponible),
+    }));
+
   return {
     sillasPosibles: minSillas === Infinity ? 0 : minSillas,
     limitante,
+    faltantes,
   };
 }
 

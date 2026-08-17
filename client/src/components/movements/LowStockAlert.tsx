@@ -2,6 +2,7 @@ import type { Componente } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { qtyWithUnit } from '@/lib/utils'
 
 interface Props {
   componentes: Componente[]
@@ -31,7 +32,7 @@ export default function LowStockAlert({ componentes }: Props) {
                   <TableRow key={c._id}>
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell className={c.stockDisponible === 0 ? 'text-destructive font-bold' : 'text-amber-600 font-bold'}>
-                      {c.stockDisponible === 0 ? 'Sin stock' : `${c.stockDisponible} ${c.unit}`}
+                      {c.stockDisponible === 0 ? 'Sin stock' : qtyWithUnit(c.stockDisponible, c.unit)}
                     </TableCell>
                     <TableCell>
                       {c.stockDisponible === 0

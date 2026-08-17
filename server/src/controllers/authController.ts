@@ -273,6 +273,7 @@ export async function listLogs(req: Request, res: Response) {
 
   const [logs, total] = await Promise.all([
     AuditLog.find(filter)
+      .populate('userId', 'username name role')
       .sort({ createdAt: -1 })
       .skip(getSkip(page, limit))
       .limit(limit)

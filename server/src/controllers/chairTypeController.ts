@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { ChairType, BOMItem, Component } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { calcularSillasPosiblesConDetalle, sillasPosiblesPorTipo } from '../services/stockService';
@@ -10,11 +11,12 @@ import { applyImageMatches, matchImagesToChairs } from '../services/chairImageSe
 import path from 'path';
 
 export async function list(req: Request, res: Response) {
-  const { q, tipo, subtipo, marca, page, limit, sort, order } = req.query as {
+  const { q, tipo, subtipo, marca, chairTipo, page, limit, sort, order } = req.query as {
     q?: string;
     tipo?: string;
     subtipo?: string;
     marca?: string;
+    chairTipo?: string;
     page?: string;
     limit?: string;
     sort?: 'nombre' | 'posibles' | 'activo';
@@ -54,6 +56,7 @@ export async function list(req: Request, res: Response) {
 
   const filter: Record<string, unknown> = {};
   if (q) filter.name = { $regex: escapeRegex(q), $options: 'i' };
+  if (chairTipo) filter.tipo = chairTipo;
   if (chairTypeIds) filter._id = { $in: chairTypeIds };
 
   const [sillasPosiblesArr, bomCounts, total] = await Promise.all([
@@ -98,6 +101,37 @@ export async function list(req: Request, res: Response) {
   res.json({ data, pagination: getPagination(pageNum, limitNum, total) });
 }
 
+export async function tipos(_req: Request, res: Response) {
+  const result = await ChairType.aggregate([
+    { $match: { tipo: { $nin: [null, ''] } } },
+    { $group: { _id: '$tipo', count: { $sum: 1 } } },
+    { $sort: { _id: 1 } },
+  ]);
+  res.json({ data: result.map((r) => ({ tipo: r._id, count: r.count })) });
+}
+
+export async function boms(req: Request, res: Response) {
+  const { ids } = req.query as { ids?: string };
+  const chairTypeIds = (ids ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => mongoose.isValidObjectId(id));
+
+  const items = await BOMItem.find({ chairTypeId: { $in: chairTypeIds } })
+    .populate('componentId', 'name unit')
+    .lean();
+
+  res.json({
+    data: items.map((item) => ({
+      chairTypeId: (item.chairTypeId as unknown as { _id: string })._id.toString(),
+      componentId: (item.componentId as unknown as { _id: string; name: string; unit: string })._id.toString(),
+      componentName: (item.componentId as unknown as { name: string }).name,
+      componentUnit: (item.componentId as unknown as { unit: string }).unit ?? '',
+      quantity: item.quantity,
+    })),
+  });
+}
+
 export async function getById(req: Request, res: Response) {
   const tipo = await ChairType.findById(req.params.id).lean();
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
@@ -105,7 +139,10 @@ export async function getById(req: Request, res: Response) {
   const bom = await BOMItem.find({ chairTypeId: tipo._id })
     .populate('componentId', 'name unit')
     .lean();
-  res.json({ data: { ...tipo, bom } });
+
+  const detalle = await calcularSillasPosiblesConDetalle(tipo._id.toString());
+
+  res.json({ data: { ...tipo, bom, ...detalle } });
 }
 
 async function validateBOMComponents(bom: { componentId: string; quantity: number }[]) {

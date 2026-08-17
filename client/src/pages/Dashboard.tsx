@@ -12,6 +12,7 @@ import LowStockAlert from '@/components/movements/LowStockAlert'
 import { cn } from '@/lib/utils'
 import { Plus, Package, AlertTriangle, ClipboardList, TrendingUp, Armchair, AlertCircle, ChevronDown } from 'lucide-react'
 import StockMovementsTable from '@/components/movements/StockMovementsTable'
+import { getOrdenSillas, getOrdenSillasTotal } from '@/lib/ordenes'
 
 const statusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
@@ -225,10 +226,12 @@ export default function Dashboard() {
                   <div className="border rounded-lg p-3 hover:bg-muted transition-colors group">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono text-xs text-muted-foreground">OT #{ot._id.slice(-6)}</span>
-                      <span className="text-xs text-muted-foreground">x{ot.quantity}</span>
+                      <span className="text-xs text-muted-foreground">x{getOrdenSillasTotal(ot)}</span>
                     </div>
                     <p className="font-medium text-sm group-hover:text-primary transition-colors">
-                      {ot.chairTypeId?.name ?? 'Solo repuestos'}
+                      {getOrdenSillas(ot).length === 0
+                        ? 'Solo repuestos'
+                        : getOrdenSillas(ot).map((s) => s.chairTypeId.name).join(', ')}
                     </p>
                     {status === 'finalizada' && ot.finalizedAt && (
                       <p className="text-xs text-muted-foreground mt-1">{formatShortDate(ot.finalizedAt)}</p>

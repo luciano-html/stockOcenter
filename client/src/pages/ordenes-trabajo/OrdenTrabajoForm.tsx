@@ -1,23 +1,23 @@
-import { useMemo, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/services/api'
-import { cn } from '@/lib/utils'
-import type { ChairTypeWithBOM, Componente, AxiosErrorType, WorkOrder } from '@/types'
+import { cn, qtyWithUnit } from '@/lib/utils'
+import type { ChairTypeWithBOM, Componente, AxiosErrorType, WorkOrder, User as Usuario } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Autocomplete } from '@/components/ui/autocomplete'
+import { MultiSelectAutocomplete } from '@/components/ui/multi-select-autocomplete'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { GoBack } from '@/components/shared/GoBack'
-import { Plus, Trash2, Package, Wrench, AlertTriangle, Info, CheckCircle } from 'lucide-react'
+import { Plus, Trash2, Package, Wrench, AlertTriangle, Info, CheckCircle, User, ChevronRight } from 'lucide-react'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 const itemRowSchema: z.ZodType<
@@ -33,25 +33,29 @@ const itemRowSchema: z.ZodType<
 const schema: z.ZodType<FormData, any, any> = z
   .object({
     tipoOrden: z.enum(['silla', 'repuestos']),
-    chairTypeId: z.string().optional(),
-    quantity: z.coerce.number().int().min(1, 'Mínimo 1'),
     adicionales: z.array(itemRowSchema).default([]),
     repuestos: z.array(itemRowSchema).default([]),
   })
-  .refine(
-    (data) => {
-      if (data.tipoOrden === 'silla') return !!data.chairTypeId
-      return data.repuestos.length > 0
-    },
-    { message: 'Seleccioná un tipo de silla o agregá al menos un repuesto' }
-  )
+  .superRefine((data, ctx) => {
+    if (data.tipoOrden === 'repuestos' && data.repuestos.length === 0) {
+      ctx.addIssue({ code: 'custom', message: 'Agregá al menos un repuesto' })
+    }
+  })
 
 type FormData = {
   tipoOrden: 'silla' | 'repuestos'
-  chairTypeId?: string
-  quantity: number
   adicionales: { componentId: string; componentName: string; quantity: number }[]
   repuestos: { componentId: string; componentName: string; quantity: number }[]
+}
+
+interface SillaRow {
+  id: string
+  chairTypeId: string
+  quantity: string
+}
+
+function generateId() {
+  return Math.random().toString(36).slice(2, 9)
 }
 
 export default function OrdenTrabajoForm() {
@@ -59,10 +63,13 @@ export default function OrdenTrabajoForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isEditing = !!id
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [selectedOperator, setSelectedOperator] = useState('')
+  const [sillasRows, setSillasRows] = useState<SillaRow[]>([])
+  const [multiSelected, setMultiSelected] = useState<string[]>([])
+  const [sillasError, setSillasError] = useState('')
 
   const {
-    register,
     control,
     handleSubmit,
     watch,
@@ -73,15 +80,14 @@ export default function OrdenTrabajoForm() {
     resolver: zodResolver(schema),
     defaultValues: {
       tipoOrden: 'silla',
-      quantity: 1,
       adicionales: [],
       repuestos: [],
     },
   })
 
   const tipoOrden = watch('tipoOrden')
-  const chairTypeId = watch('chairTypeId')
-  const quantity = watch('quantity')
+  const adicionalesWatched = watch('adicionales')
+  const repuestosWatched = watch('repuestos')
 
   const { data: tiposData, isLoading: loadingTipos } = useQuery<{ data: ChairTypeWithBOM[] }>({
     queryKey: ['tipos-silla-select'],
@@ -130,10 +136,19 @@ export default function OrdenTrabajoForm() {
           }
         })
 
+      const sillas = ot.sillas && ot.sillas.length > 0
+        ? ot.sillas.map((s) => ({
+            id: generateId(),
+            chairTypeId: s.chairTypeId._id,
+            quantity: String(s.quantity),
+          }))
+        : ot.chairTypeId
+          ? [{ id: generateId(), chairTypeId: ot.chairTypeId._id, quantity: String(ot.quantity ?? 1) }]
+          : []
+
+      setSillasRows(sillas)
       reset({
-        tipoOrden: ot.chairTypeId ? 'silla' : 'repuestos',
-        chairTypeId: ot.chairTypeId?._id,
-        quantity: ot.quantity,
+        tipoOrden: sillas.length > 0 ? 'silla' : 'repuestos',
         adicionales,
         repuestos,
       })
@@ -156,7 +171,7 @@ export default function OrdenTrabajoForm() {
     () =>
       (compData ?? []).map((c) => ({
         value: c._id,
-        label: `${c.name} (${c.tipo}${c.marca ? ` - ${c.marca}` : ''}) — disp. ${c.stockDisponible} ${c.unit}`,
+        label: `${c.name} (${c.tipo}${c.marca ? ` - ${c.marca}` : ''}) — disp. ${qtyWithUnit(c.stockDisponible, c.unit)}`,
       })),
     [compData]
   )
@@ -178,18 +193,29 @@ export default function OrdenTrabajoForm() {
     }))
   }, [tiposData])
 
-  const selectedChairName = useMemo(
-    () => tipoSillaOptions.find((t) => t.value === chairTypeId)?.label ?? '',
-    [tipoSillaOptions, chairTypeId]
-  )
+  const chairMap = useMemo(() => {
+    const map = new Map<string, ChairTypeWithBOM>()
+    tiposData?.data.forEach((t) => map.set(t._id, t))
+    return map
+  }, [tiposData])
 
-  const selectedChair = useMemo(
-    () => tiposData?.data.find((t) => t._id === chairTypeId),
-    [tiposData, chairTypeId]
-  )
+  const sillaIds = useMemo(() => sillasRows.map((s) => s.chairTypeId), [sillasRows])
 
-  const sillasPosibles = selectedChair?.sillasPosibles ?? 0
-  const excedeCapacidad = tipoOrden === 'silla' && chairTypeId && (Number(quantity) || 0) > sillasPosibles
+  const { data: bomsData } = useQuery<{ data: { chairTypeId: string; componentId: string; quantity: number }[] }>({
+    queryKey: ['tipos-silla-bom', sillaIds.join(',')],
+    queryFn: () => api.get('/tipos-silla/bom', { params: { ids: sillaIds.join(',') } }).then((r) => r.data),
+    enabled: tipoOrden === 'silla' && sillaIds.length > 0,
+  })
+
+  const bomMap = useMemo(() => {
+    const map = new Map<string, { componentId: string; quantity: number }[]>()
+    bomsData?.data.forEach((item) => {
+      const list = map.get(item.chairTypeId) ?? []
+      list.push({ componentId: item.componentId, quantity: item.quantity })
+      map.set(item.chairTypeId, list)
+    })
+    return map
+  }, [bomsData])
 
   const requerimientos = useMemo(() => {
     if (!compData) return []
@@ -203,25 +229,63 @@ export default function OrdenTrabajoForm() {
       map.set(componentId, current)
     }
 
-    if (tipoOrden === 'silla' && selectedChair?.bom) {
-      selectedChair.bom.forEach((bomItem) => {
-        const compId = typeof bomItem.componentId === 'string' ? bomItem.componentId : bomItem.componentId._id
-        addReq(compId, (Number(quantity) || 0) * bomItem.quantity)
+    if (tipoOrden === 'silla') {
+      sillasRows.forEach((row) => {
+        const qty = Number(row.quantity) || 0
+        if (qty <= 0) return
+        ;(bomMap.get(row.chairTypeId) ?? []).forEach((bomItem) => {
+          addReq(bomItem.componentId, qty * bomItem.quantity)
+        })
       })
     }
 
-    adicFields.forEach((item) => addReq(item.componentId, item.quantity))
-    repFields.forEach((item) => addReq(item.componentId, item.quantity))
+    adicionalesWatched.forEach((item) => addReq(item.componentId, item.quantity))
+    repuestosWatched.forEach((item) => addReq(item.componentId, item.quantity))
 
     return Array.from(map.values()).sort((a, b) => a.componente.name.localeCompare(b.componente.name))
-  }, [tipoOrden, selectedChair, quantity, adicFields, repFields, compData, componentMap])
+  }, [tipoOrden, sillasRows, bomMap, adicionalesWatched, repuestosWatched, compData, componentMap])
 
   const faltantes = requerimientos.filter((r) => r.necesario > r.componente.stockDisponible)
   const hayStockSuficiente = faltantes.length === 0
 
+  function addMultiSelectedToSillas() {
+    const existingIds = new Set(sillasRows.map((s) => s.chairTypeId))
+    const newRows = multiSelected
+      .filter((id) => !existingIds.has(id))
+      .map((id) => ({ id: generateId(), chairTypeId: id, quantity: '1' }))
+
+    if (newRows.length === 0) {
+      setSillasError('Los tipos de silla seleccionados ya están en la orden')
+      setTimeout(() => setSillasError(''), 3000)
+      return
+    }
+
+    setSillasRows((prev) => [...prev, ...newRows])
+    setMultiSelected([])
+    setSillasError('')
+  }
+
+  function updateSillaQuantity(sillaId: string, value: string) {
+    setSillasRows((prev) => prev.map((s) => (s.id === sillaId ? { ...s, quantity: value } : s)))
+  }
+
+  function removeSilla(sillaId: string) {
+    setSillasRows((prev) => prev.filter((s) => s.id !== sillaId))
+  }
+
+  const sillasLabel = useMemo(
+    () =>
+      sillasRows
+        .map((s) => `${chairMap.get(s.chairTypeId)?.name ?? 'Silla'} x${s.quantity || 0}`)
+        .join(', '),
+    [sillasRows, chairMap]
+  )
+
   const buildPayload = (form: FormData) => ({
-    ...(form.tipoOrden === 'silla' && form.chairTypeId ? { chairTypeId: form.chairTypeId } : {}),
-    quantity: form.quantity,
+    sillas:
+      form.tipoOrden === 'silla'
+        ? sillasRows.map((s) => ({ chairTypeId: s.chairTypeId, quantity: Number(s.quantity) }))
+        : undefined,
     items: [
       ...form.adicionales.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'adicional' as const })),
       ...form.repuestos.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'repuesto' as const })),
@@ -233,7 +297,7 @@ export default function OrdenTrabajoForm() {
       const payload = buildPayload(form)
       return isEditing
         ? api.patch(`/ordenes-trabajo/${id}`, payload)
-        : api.post('/ordenes-trabajo', payload)
+        : api.post('/ordenes-trabajo', { ...payload, assignedTo: selectedOperator || undefined })
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
@@ -247,43 +311,180 @@ export default function OrdenTrabajoForm() {
     },
   })
 
-  const onSubmit = handleSubmit(() => setShowConfirm(true))
+  const { data: usuariosData } = useQuery<{ data: Usuario[] }>({
+    queryKey: ['usuarios', 'asignar'],
+    queryFn: () => api.get('/auth/usuarios', { params: { limit: 1000 } }).then((r) => r.data),
+    enabled: !isEditing,
+  })
+
+  const empleados = (usuariosData?.data ?? []).filter((u) => u.role === 'operario')
+
+  function validateSillas(): string | null {
+    if (tipoOrden === 'silla' && sillasRows.length === 0) {
+      return 'Agregá al menos un tipo de silla'
+    }
+    for (const s of sillasRows) {
+      if (!s.quantity || Number(s.quantity) < 1) {
+        return 'La cantidad de cada silla debe ser al menos 1'
+      }
+    }
+    return null
+  }
+
+  function goToStep2(e?: React.FormEvent) {
+    const error = validateSillas()
+    if (error) {
+      e?.preventDefault()
+      setSillasError(error)
+      setTimeout(() => setSillasError(''), 3000)
+      return
+    }
+    handleSubmit(() => setStep(2))(e)
+  }
+
+  const currentForm: FormData = {
+    tipoOrden,
+    adicionales: adicionalesWatched,
+    repuestos: repuestosWatched,
+  }
+
+  const stepLabels: Record<1 | 2 | 3, string> = {
+    1: 'Selección',
+    2: 'Confirmación',
+    3: 'Asignar operario',
+  }
+
+  const totalSteps = isEditing ? 2 : 3
+  const steps = [1, 2, 3].slice(0, totalSteps).map((n) => ({
+    n: n as 1 | 2 | 3,
+    label: stepLabels[n as 1 | 2 | 3],
+  }))
+
+  const rootError =
+    (errors.root?.message as string | undefined) ??
+    (errors as Record<string, { message?: string }>)['']?.message
 
   if (loadingTipos || (isEditing && loadingOrder)) return <Skeleton className="h-64" />
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/ordenes-trabajo" />
       <Card className="max-w-2xl mx-auto">
-        <CardHeader><CardTitle>{isEditing ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>{isEditing ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'}</CardTitle>
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            {steps.map((s, idx) => (
+              <Fragment key={s.n}>
+                {idx > 0 && <ChevronRight size={14} className="text-muted-foreground" />}
+                <button
+                  type="button"
+                  disabled={s.n >= step}
+                  onClick={() => setStep(s.n)}
+                  className={cn(
+                    'rounded-full px-3 py-1 border text-xs font-medium transition-colors',
+                    s.n === step
+                      ? 'bg-green-600 text-white border-green-600'
+                      : s.n < step
+                        ? 'bg-background border-border text-foreground hover:bg-muted cursor-pointer'
+                        : 'bg-muted/50 border-border text-muted-foreground cursor-default'
+                  )}
+                >
+                  {s.n}. {s.label}
+                </button>
+              </Fragment>
+            ))}
+          </div>
+        </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="tipoOrden">Tipo de orden</Label>
-              <Select id="tipoOrden" value={tipoOrden} onChange={(e) => { setValue('tipoOrden', e.target.value as 'silla' | 'repuestos'); setValue('chairTypeId', ''); setValue('adicionales', []) }}>
+          <form onSubmit={step === 1 ? goToStep2 : (e) => e.preventDefault()} className="space-y-6">
+            {step === 1 && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="tipoOrden">Tipo de orden</Label>
+              <Select id="tipoOrden" value={tipoOrden} onChange={(e) => { setValue('tipoOrden', e.target.value as 'silla' | 'repuestos'); setSillasRows([]); setValue('adicionales', []) }}>
                 <option value="silla">Silla + adicionales</option>
                 <option value="repuestos">Solo repuestos</option>
               </Select>
             </div>
 
             {tipoOrden === 'silla' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="chairTypeId">Tipo de silla</Label>
-                  <Autocomplete
-                    id="chairTypeId"
-                    options={tipoSillaOptions}
-                    value={chairTypeId ?? ''}
-                    onChange={(v) => setValue('chairTypeId', v)}
-                    placeholder="Buscar tipo de silla..."
-                  />
-                  {errors.chairTypeId && <p className="text-xs text-destructive">{errors.chairTypeId.message}</p>}
+              <div className="space-y-3">
+                <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
+                  <div className="flex-1 w-full">
+                    <MultiSelectAutocomplete
+                      options={tipoSillaOptions}
+                      selected={multiSelected}
+                      onChange={setMultiSelected}
+                      placeholder="Escribí para filtrar y marcá con checkbox..."
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full lg:w-auto whitespace-nowrap"
+                    disabled={multiSelected.length === 0}
+                    onClick={addMultiSelectedToSillas}
+                  >
+                    <Plus size={16} className="mr-1" />
+                    Agregar {multiSelected.length > 0 ? `${multiSelected.length}` : ''}
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Cantidad</Label>
-                  <Input id="quantity" type="text" inputMode="numeric" {...register('quantity')} />
-                  {errors.quantity && <p className="text-xs text-destructive">{errors.quantity.message}</p>}
-                </div>
+
+                {sillasError && (
+                  <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
+                    {sillasError}
+                  </div>
+                )}
+
+                {sillasRows.length > 0 && (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tipo de silla</TableHead>
+                          <TableHead className="w-32">Cantidad</TableHead>
+                          <TableHead className="w-12"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sillasRows.map((row) => {
+                          const chair = chairMap.get(row.chairTypeId)
+                          const posibles = chair?.sillasPosibles ?? 0
+                          const qty = Number(row.quantity) || 0
+                          const excede = qty > posibles
+                          return (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <div>
+                                  <span className="font-medium">{chair?.name ?? 'Tipo de silla'}</span>
+                                  <p className={cn('text-xs', excede ? 'text-destructive' : 'text-muted-foreground')}>
+                                    {excede
+                                      ? `Con el stock actual solo se pueden fabricar ${posibles} silla(s)`
+                                      : `Stock para fabricar hasta ${posibles} silla(s)`}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="Cantidad"
+                                  value={row.quantity}
+                                  onChange={(e) => updateSillaQuantity(row.id, e.target.value.replace(/\D/g, ''))}
+                                />
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <Button variant="ghost" size="icon" onClick={() => removeSilla(row.id)} aria-label="Quitar tipo de silla">
+                                  <Trash2 size={16} className="text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -320,28 +521,83 @@ export default function OrdenTrabajoForm() {
               {errors.repuestos && <p className="text-xs text-destructive">{errors.repuestos.message}</p>}
             </div>
 
+            {rootError && <p className="text-xs text-destructive">{rootError}</p>}
+
+            <div className="flex gap-2 justify-end pt-2 border-t">
+              <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
+                SIGUIENTE <ChevronRight size={16} />
+              </Button>
+            </div>
+              </>
+            )}
+
+            {step === 2 && (
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Package size={16} className="text-muted-foreground" />
+                    <Label className="text-sm font-medium">Resumen de la orden</Label>
+                  </div>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Tipo de silla</TableHead>
+                          <TableHead className="text-right">Cantidad</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sillasRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell className="text-muted-foreground">Solo repuestos</TableCell>
+                            <TableCell className="text-right text-muted-foreground">—</TableCell>
+                          </TableRow>
+                        ) : (
+                          sillasRows.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell className="font-medium">{chairMap.get(row.chairTypeId)?.name ?? 'Silla'}</TableCell>
+                              <TableCell className="text-right">{row.quantity}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-md border p-3">
+                      <p className="text-sm font-medium mb-2">Adicionales ({adicFields.length})</p>
+                      {adicFields.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Sin adicionales</p>
+                      ) : (
+                        <ul className="text-sm space-y-1">
+                          {adicFields.map((i) => (
+                            <li key={i.id}>• {i.componentName} ×{i.quantity}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div className="rounded-md border p-3">
+                      <p className="text-sm font-medium mb-2">Repuestos ({repFields.length})</p>
+                      {repFields.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Sin repuestos</p>
+                      ) : (
+                        <ul className="text-sm space-y-1">
+                          {repFields.map((i) => (
+                            <li key={i.id}>• {i.componentName} ×{i.quantity}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
             {requerimientos.length > 0 && (
               <div className="border-t pt-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Info size={16} className="text-muted-foreground" />
                   <Label className="text-sm font-medium">Disponibilidad</Label>
                 </div>
-
-                {tipoOrden === 'silla' && chairTypeId && (
-                  <div className={cn(
-                    'rounded-md border p-3 text-sm',
-                    excedeCapacidad ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-green-50 border-green-200 text-green-900'
-                  )}>
-                    <div className="flex items-center gap-2">
-                      {excedeCapacidad ? <AlertTriangle size={16} /> : <CheckCircle size={16} />}
-                      <span className="font-medium">
-                        {excedeCapacidad
-                          ? `Con el stock actual solo se pueden fabricar ${sillasPosibles} silla(s).`
-                          : `Stock suficiente para fabricar hasta ${sillasPosibles} silla(s).`}
-                      </span>
-                    </div>
-                  </div>
-                )}
 
                 <div className="rounded-md border overflow-x-auto">
                   <Table>
@@ -351,6 +607,7 @@ export default function OrdenTrabajoForm() {
                         <TableHead className="text-right">Necesario</TableHead>
                         <TableHead className="text-right">Disponible</TableHead>
                         <TableHead className="text-right">Faltante</TableHead>
+                        <TableHead className="text-right">Quedarían</TableHead>
                         <TableHead>Estado</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -361,10 +618,13 @@ export default function OrdenTrabajoForm() {
                         return (
                           <TableRow key={componente._id}>
                             <TableCell className="font-medium">{componente.name}</TableCell>
-                            <TableCell className="text-right">{necesario} {componente.unit}</TableCell>
-                            <TableCell className="text-right">{componente.stockDisponible} {componente.unit}</TableCell>
+                            <TableCell className="text-right">{qtyWithUnit(necesario, componente.unit)}</TableCell>
+                            <TableCell className="text-right">{qtyWithUnit(componente.stockDisponible, componente.unit)}</TableCell>
                             <TableCell className={cn('text-right font-medium', !ok && 'text-destructive')}>
-                              {faltante > 0 ? `${faltante} ${componente.unit}` : '—'}
+                              {faltante > 0 ? qtyWithUnit(faltante, componente.unit) : '—'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {qtyWithUnit(Math.max(0, componente.stockDisponible - necesario), componente.unit)}
                             </TableCell>
                             <TableCell>
                               {ok
@@ -387,34 +647,53 @@ export default function OrdenTrabajoForm() {
               </div>
             )}
 
-            {errors.root && <p className="text-xs text-destructive">{errors.root.message}</p>}
+            {rootError && <p className="text-xs text-destructive">{rootError}</p>}
 
-            <div className="flex gap-2 justify-end pt-2">
-              <Button type="button" variant="outline" onClick={() => navigate('/ordenes-trabajo')}>Cancelar</Button>
-              <Button type="submit" disabled={mutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
-                {mutation.isPending ? 'Guardando...' : (isEditing ? 'Guardar cambios' : 'Crear orden')}
-              </Button>
+            <div className="flex gap-2 justify-end pt-2 border-t">
+              <Button type="button" variant="outline" onClick={() => setStep(1)}>Volver</Button>
+              {isEditing ? (
+                <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" disabled={mutation.isPending} onClick={() => mutation.mutate(currentForm)}>
+                  {mutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+                </Button>
+              ) : (
+                <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setStep(3)}>
+                  SIGUIENTE <ChevronRight size={16} />
+                </Button>
+              )}
             </div>
+              </>
+            )}
+
+            {!isEditing && step === 3 && (
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <User size={16} className="text-muted-foreground" />
+                    <Label className="text-sm font-medium">Asignar operario</Label>
+                  </div>
+                  <Select value={selectedOperator} onChange={(e) => setSelectedOperator(e.target.value)}>
+                    <option value="">Seleccioná un operario...</option>
+                    {empleados.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name || u.username} ({u.role})</option>
+                    ))}
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    {tipoOrden === 'silla' ? (sillasLabel || 'Sillas') : 'Solo repuestos'}
+                    {adicFields.length > 0 && ` · ${adicFields.length} adicional(es)`}
+                    {repFields.length > 0 && ` · ${repFields.length} repuesto(s)`}
+                  </p>
+                </div>
+                <div className="flex gap-2 justify-end pt-2 border-t">
+                  <Button type="button" variant="outline" onClick={() => setStep(2)}>Volver</Button>
+                  <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" disabled={mutation.isPending || !selectedOperator} onClick={() => mutation.mutate(currentForm)}>
+                    {mutation.isPending ? 'Creando...' : 'Crear orden'}
+                  </Button>
+                </div>
+              </>
+            )}
           </form>
         </CardContent>
       </Card>
-
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <DialogHeader>
-          <DialogTitle>{isEditing ? '¿Guardar cambios?' : '¿Crear orden de trabajo?'}</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground mb-4">
-          {tipoOrden === 'silla'
-            ? `Orden por ${quantity} silla${(Number(quantity) !== 1 ? 's' : '')} ${selectedChairName}.`
-            : 'Orden de solo repuestos.'}
-          {adicFields.length > 0 && ` Incluye ${adicFields.length} adicional(es).`}
-          {repFields.length > 0 && ` Incluye ${repFields.length} repuesto(s).`}
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>
-          <Button onClick={() => { setShowConfirm(false); handleSubmit((form) => mutation.mutate(form))() }}>Confirmar</Button>
-        </div>
-      </Dialog>
     </div>
   )
 }
@@ -427,7 +706,7 @@ function ItemRowEditor({
   onAdd: (componentId: string, componentName: string, quantity: number) => void
 }) {
   const [componentId, setComponentId] = useState('')
-  const [cantidad, setCantidad] = useState('1')
+  const [cantidad, setCantidad] = useState('')
 
   function handleAdd() {
     const comp = options.find((o) => o.value === componentId)
@@ -448,7 +727,7 @@ function ItemRowEditor({
         />
       </div>
       <div className="w-24">
-        <Input type="text" inputMode="numeric" placeholder="Cant." value={cantidad}
+        <Input type="text" inputMode="numeric" placeholder="Cantidad" value={cantidad}
           onChange={(e) => setCantidad(e.target.value.replace(/\D/g, ''))} />
       </div>
       <Button variant="outline" size="icon" onClick={handleAdd} disabled={!componentId || !cantidad || Number(cantidad) < 1}>

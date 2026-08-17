@@ -79,7 +79,7 @@ export default function ComponenteForm() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/componentes" />
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>{isEdit ? 'Editar componente' : 'Nuevo componente'}</CardTitle></CardHeader>
       <CardContent>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Search, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getMovimientoSillasLabel } from '@/lib/ordenes'
 import { GoBack } from '@/components/shared/GoBack'
 
 export default function MovimientosList() {
@@ -50,7 +51,7 @@ export default function MovimientosList() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/" />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <History size={24} />
@@ -102,7 +103,7 @@ export default function MovimientosList() {
                     : undefined
                   const shortId = workOrderId?.slice(-6)
                   const chairName = isWorkOrder && typeof m.referenceId === 'object'
-                    ? m.referenceId?.chairTypeId?.name
+                    ? getMovimientoSillasLabel(m.referenceId)
                     : undefined
 
                   return (

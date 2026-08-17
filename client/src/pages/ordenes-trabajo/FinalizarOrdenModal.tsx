@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { AlertTriangle, CheckCircle, Package } from 'lucide-react'
+import { qtyWithUnit } from '@/lib/utils'
 
 interface Item {
   componentId: { _id: string; name: string; unit: string; tipo?: string; subtipo?: string; marca?: string }
@@ -113,7 +114,7 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
                 {items.map((item, idx) => (
                   <TableRow key={idx}>
                     <TableCell className="font-medium">{getItemLabel(item)}</TableCell>
-                    <TableCell>{item.quantity} {item.unit || item.componentId.unit}</TableCell>
+                    <TableCell>{qtyWithUnit(item.quantity, item.unit || item.componentId.unit)}</TableCell>
                     <TableCell>
                       <Input
                         type="text"
@@ -164,7 +165,7 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
                       <Package size={16} className="text-muted-foreground" />
                       {getItemLabel(item)}
                     </TableCell>
-                    <TableCell>{item.quantity} {item.unit || item.componentId.unit}</TableCell>
+                    <TableCell>{qtyWithUnit(item.quantity, item.unit || item.componentId.unit)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

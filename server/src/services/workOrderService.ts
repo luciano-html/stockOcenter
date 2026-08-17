@@ -15,13 +15,39 @@ export function canTransition(from: string, to: string): boolean {
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-async function getItems(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
-  const bomItems = chairTypeId
-    ? (await BOMItem.find({ chairTypeId }).lean()).map((item) => ({
-        componentId: item.componentId.toString(),
-        quantity: item.quantity * quantity,
-      }))
-    : [];
+export interface SillaReq {
+  chairTypeId: string;
+  quantity: number;
+}
+
+export function resolveSillas(sillas: SillaReq[] | undefined, chairTypeId?: string, quantity?: number): SillaReq[] {
+  if (sillas && sillas.length > 0) return sillas;
+  if (chairTypeId) return [{ chairTypeId, quantity: quantity ?? 1 }];
+  return [];
+}
+
+async function getItems(sillas: SillaReq[], items?: IWorkOrderItem[]) {
+  const bomItems: { componentId: string; quantity: number }[] = [];
+
+  if (sillas.length > 0) {
+    const chairTypeIds = sillas.map((s) => s.chairTypeId);
+    const bom = await BOMItem.find({ chairTypeId: { $in: chairTypeIds } }).lean();
+    const bomMap = new Map<string, typeof bom>();
+    for (const item of bom) {
+      const key = item.chairTypeId.toString();
+      if (!bomMap.has(key)) bomMap.set(key, []);
+      bomMap.get(key)!.push(item);
+    }
+    for (const silla of sillas) {
+      for (const item of bomMap.get(silla.chairTypeId) ?? []) {
+        bomItems.push({
+          componentId: item.componentId.toString(),
+          quantity: item.quantity * silla.quantity,
+        });
+      }
+    }
+  }
+
   const extras = (items ?? []).map((i) => ({
     componentId: i.componentId.toString(),
     quantity: i.quantity,
@@ -29,8 +55,15 @@ async function getItems(chairTypeId: string | undefined, quantity: number, items
   return [...bomItems, ...extras];
 }
 
-export async function reservarStock(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
-  const compList = await getItems(chairTypeId, quantity, items);
+async function getSillasLabel(sillas: SillaReq[]): Promise<string | null> {
+  if (sillas.length === 0) return null;
+  const chairs = await ChairType.find({ _id: { $in: sillas.map((s) => s.chairTypeId) } }).lean();
+  const map = new Map(chairs.map((c) => [c._id.toString(), c.name]));
+  return sillas.map((s) => `${map.get(s.chairTypeId) ?? 'Silla'} x${s.quantity}`).join(', ');
+}
+
+export async function reservarStock(sillas: SillaReq[], items?: IWorkOrderItem[]) {
+  const compList = await getItems(sillas, items);
   if (!compList.length) throw ApiError.badRequest('La orden no tiene componentes definidos');
 
   // Verificar disponibilidad de todos los componentes antes de reservar
@@ -92,15 +125,14 @@ export async function reservarStock(chairTypeId: string | undefined, quantity: n
 }
 
 export async function descontarStock(
-  chairTypeId: string | undefined,
-  quantity: number,
+  sillas: SillaReq[],
   workOrderId: string,
   items: IWorkOrderItem[] | undefined,
   userId: string | undefined,
   userRole: 'admin' | 'operario' | undefined
 ) {
-  const compList = await getItems(chairTypeId, quantity, items);
-  const chairType = chairTypeId ? await ChairType.findById(chairTypeId).lean() : null;
+  const compList = await getItems(sillas, items);
+  const sillasLabel = await getSillasLabel(sillas);
   const descontados: { componentId: string; quantity: number }[] = [];
 
   try {
@@ -119,12 +151,13 @@ export async function descontarStock(
     throw err;
   }
 
-  const label = chairType ? `Silla ${chairType.name ?? ''} x${quantity}` : `Repuestos x${quantity}`;
+  const totalRepuestos = (items ?? []).reduce((sum, i) => sum + i.quantity, 0);
+  const label = sillasLabel ?? `Repuestos x${totalRepuestos}`;
 
   if (compList.length === 0) {
     await StockMovement.create({
       type: 'egreso',
-      quantity,
+      quantity: totalRepuestos,
       referenceType: 'work-order',
       referenceId: workOrderId,
       notes: `${label} (OT #${workOrderId.slice(-6)})`,
@@ -149,8 +182,8 @@ export async function descontarStock(
   clearStockCache();
 }
 
-export async function liberarReserva(chairTypeId: string | undefined, quantity: number, items?: IWorkOrderItem[]) {
-  const compList = await getItems(chairTypeId, quantity, items);
+export async function liberarReserva(sillas: SillaReq[], items?: IWorkOrderItem[]) {
+  const compList = await getItems(sillas, items);
 
   for (const item of compList) {
     await Component.findByIdAndUpdate(item.componentId, {
@@ -167,7 +200,12 @@ export async function recalcularReservas() {
   const reservas: Record<string, number> = {};
 
   for (const ot of ordenes) {
-    const items = await getItems(ot.chairTypeId?.toString(), ot.quantity, ot.items);
+    const sillas = resolveSillas(
+      ot.sillas?.map((s) => ({ chairTypeId: s.chairTypeId.toString(), quantity: s.quantity })),
+      ot.chairTypeId?.toString(),
+      ot.quantity
+    );
+    const items = await getItems(sillas, ot.items);
     for (const item of items) {
       reservas[item.componentId] = (reservas[item.componentId] ?? 0) + item.quantity;
     }

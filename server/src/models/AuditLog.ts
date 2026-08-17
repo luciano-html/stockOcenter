@@ -24,7 +24,8 @@ export type AuditAction =
   | 'work_order_created'
   | 'work_order_updated'
   | 'work_order_status_changed'
-  | 'work_order_finished';
+  | 'work_order_finished'
+  | 'work_order_assigned';
 
 export type AuditSeverity = 'info' | 'warning' | 'error';
 

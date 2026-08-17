@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { ChairTypeWithBOM, ComponenteFiltros, Pagination } from '@/types'
+import type { ChairTypeWithBOM, ComponenteFiltros, Pagination, BomDetalleItem } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,14 +10,16 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, ChevronDown, Image } from 'lucide-react'
-import { useState } from 'react'
+import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, ChevronDown, Image, ArmchairIcon } from 'lucide-react'
+import { useState, useMemo } from 'react'
 import { GoBack } from '@/components/shared/GoBack'
+import { qtyWithUnit, cn } from '@/lib/utils'
 
 export default function TiposSillaList() {
   const [params, setParams] = useSearchParams()
   const search = params.get('q') ?? ''
   const tipoFiltro = params.get('tipo') ?? ''
+  const chairTipoFiltro = params.get('chairTipo') ?? ''
   const subtipoFiltro = params.get('subtipo') ?? ''
   const marcaFiltro = params.get('marca') ?? ''
   const activeFiltro = params.get('active') ?? ''
@@ -32,13 +34,14 @@ export default function TiposSillaList() {
   const isAdmin = user?.role === 'admin'
 
   const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM[]; pagination: Pagination }>({
-    queryKey: ['tipos-silla', search, tipoFiltro, subtipoFiltro, marcaFiltro, activeFiltro, page, sort, order],
+    queryKey: ['tipos-silla', search, tipoFiltro, chairTipoFiltro, subtipoFiltro, marcaFiltro, activeFiltro, page, sort, order],
     queryFn: () =>
       api
         .get('/tipos-silla', {
           params: {
             q: search || undefined,
             tipo: tipoFiltro || undefined,
+            chairTipo: chairTipoFiltro || undefined,
             subtipo: subtipoFiltro || undefined,
             marca: marcaFiltro || undefined,
             active: activeFiltro || undefined,
@@ -50,6 +53,16 @@ export default function TiposSillaList() {
         })
         .then((r) => r.data),
   })
+
+  const { data: tiposConteo } = useQuery<{ data: { tipo: string; count: number }[] }>({
+    queryKey: ['tipos-silla', 'tipos'],
+    queryFn: () => api.get('/tipos-silla/tipos').then((r) => r.data),
+  })
+
+  const totalTipos = useMemo(
+    () => (tiposConteo?.data ?? []).reduce((sum, t) => sum + t.count, 0),
+    [tiposConteo]
+  )
 
   const { data: filtrosData } = useQuery<{ data: ComponenteFiltros }>({
     queryKey: ['componentes-filtros'],
@@ -123,17 +136,17 @@ export default function TiposSillaList() {
   }
 
   function ExpandedRow({ chairTypeId }: { chairTypeId: string }) {
-    const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM }>({
+    const { data, isLoading } = useQuery<{ data: { items: BomDetalleItem[] } }>({
       queryKey: ['tipo-silla-bom', chairTypeId],
-      queryFn: () => api.get(`/tipos-silla/${chairTypeId}`).then((r) => r.data),
+      queryFn: () => api.get(`/tipos-silla/${chairTypeId}/bom-detalle`).then((r) => r.data),
       enabled: !!chairTypeId,
     })
 
-    const bom = data?.data.bom ?? []
+    const bom = data?.data.items ?? []
 
     return (
       <TableRow className="bg-muted/30 hover:bg-muted/30">
-        <TableCell colSpan={6} className="p-0">
+        <TableCell colSpan={7} className="p-0">
           <div className="p-4">
             {isLoading ? (
               <Skeleton className="h-24" />
@@ -148,19 +161,29 @@ export default function TiposSillaList() {
                     <TableRow>
                       <TableHead>Componente</TableHead>
                       <TableHead>Cantidad por silla</TableHead>
+                      <TableHead className="text-right">Disponible</TableHead>
+                      <TableHead className="text-right">Faltante</TableHead>
                       {isAdmin && <TableHead className="w-16">Acciones</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {bom.map((item) => {
-                      const comp = typeof item.componentId === 'string' ? null : item.componentId
-                      const componentId = typeof item.componentId === 'string' ? item.componentId : item.componentId._id
+                      const faltante = Math.max(0, item.quantity - item.stockDisponible)
+                      const componentId = item.componentId._id
                       return (
-                        <TableRow key={item._id}>
-                          <TableCell className="font-medium">
-                            {comp ? comp.name : 'Componente no encontrado'}
+                        <TableRow key={componentId}>
+                          <TableCell className="font-medium">{item.componentId.name}</TableCell>
+                          <TableCell>{qtyWithUnit(item.quantity, item.componentId.unit)}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {qtyWithUnit(item.stockDisponible, item.componentId.unit)}
                           </TableCell>
-                          <TableCell>{item.quantity} {comp?.unit ?? ''}</TableCell>
+                          <TableCell className="text-right">
+                            {faltante > 0 ? (
+                              <span className="text-destructive font-medium">{qtyWithUnit(faltante, item.componentId.unit)}</span>
+                            ) : (
+                              <span className="text-green-600 font-medium">OK</span>
+                            )}
+                          </TableCell>
                           {isAdmin && (
                             <TableCell>
                               <div onClick={(e) => e.stopPropagation()}>
@@ -189,7 +212,7 @@ export default function TiposSillaList() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/" />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tipos de silla</h1>
         {isAdmin && (
@@ -214,6 +237,43 @@ export default function TiposSillaList() {
           {matchMsg}
         </div>
       )}
+
+      <div className="flex border-b flex-wrap">
+        <button
+          type="button"
+          onClick={() => updateParam('chairTipo', '')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            chairTipoFiltro === ''
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <ArmchairIcon size={16} />
+          <span>Todas</span>
+          <span className={cn('text-xs', chairTipoFiltro === '' ? 'opacity-70' : 'text-muted-foreground/70')}>({totalTipos})</span>
+        </button>
+        {(tiposConteo?.data ?? []).map((t) => {
+          const isActive = chairTipoFiltro === t.tipo
+          return (
+            <button
+              key={t.tipo}
+              type="button"
+              onClick={() => updateParam('chairTipo', t.tipo)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <ArmchairIcon size={16} />
+              <span>{t.tipo}</span>
+              <span className={cn('text-xs', isActive ? 'opacity-70' : 'text-muted-foreground/70')}>({t.count})</span>
+            </button>
+          )
+        })}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="relative sm:col-span-2 lg:col-span-1">
@@ -250,7 +310,7 @@ export default function TiposSillaList() {
         </Select>
       </div>
 
-      {(search || tipoFiltro || subtipoFiltro || marcaFiltro || activeFiltro) && (
+      {(search || tipoFiltro || chairTipoFiltro || subtipoFiltro || marcaFiltro || activeFiltro) && (
         <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
             Limpiar filtros

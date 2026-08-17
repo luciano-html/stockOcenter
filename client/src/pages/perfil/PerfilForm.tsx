@@ -44,7 +44,7 @@ export default function PerfilForm() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/" />
     <Card className="max-w-lg mx-auto">
       <CardHeader><CardTitle>Mi perfil</CardTitle></CardHeader>
       <CardContent>

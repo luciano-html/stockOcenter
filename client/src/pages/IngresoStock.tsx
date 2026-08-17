@@ -14,7 +14,7 @@ import StockMovementsTable from '@/components/movements/StockMovementsTable'
 import LowStockAlert from '@/components/movements/LowStockAlert'
 import { GoBack } from '@/components/shared/GoBack'
 import { Plus, Trash2, PackageMinus, History, RotateCcw } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, qtyWithUnit } from '@/lib/utils'
 
 interface BulkItem {
   id: string
@@ -37,7 +37,7 @@ export default function IngresoStock() {
   const [activeTab, setActiveTab] = useState<TabKey>('ingreso')
 
   const [egresoComp, setEgresoComp] = useState('')
-  const [egresoCant, setEgresoCant] = useState('1')
+  const [egresoCant, setEgresoCant] = useState('')
   const [egresoNotas, setEgresoNotas] = useState('')
 
   const [bulkItems, setBulkItems] = useState<BulkItem[]>([])
@@ -88,7 +88,7 @@ export default function IngresoStock() {
     () =>
       (compData?.data ?? []).map((c) => ({
         value: c._id,
-        label: `${c.name} (${c.tipo}${c.subtipo ? ` / ${c.subtipo}` : ''}${c.marca ? ` - ${c.marca}` : ''}) — disp. ${c.stockDisponible} ${c.unit}`,
+        label: `${c.name} (${c.tipo}${c.subtipo ? ` / ${c.subtipo}` : ''}${c.marca ? ` - ${c.marca}` : ''}) — disp. ${qtyWithUnit(c.stockDisponible, c.unit)}`,
       })),
     [compData]
   )
@@ -249,7 +249,7 @@ export default function IngresoStock() {
 
   return (
     <div className="space-y-6">
-      <GoBack />
+      <GoBack to="/" />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Movimientos de stock</h1>
@@ -346,9 +346,9 @@ export default function IngresoStock() {
                               />
                               {comp && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Stock: <span className="font-medium text-foreground">{comp.stockActual}</span> {' '}
-                                  · Disp: <span className="font-medium text-foreground">{comp.stockDisponible}</span> {' '}
-                                  · Mín: <span className="font-medium text-foreground">{comp.stockMinimo}</span> {comp.unit}
+                                  Stock: <span className="font-medium text-foreground">{qtyWithUnit(comp.stockActual, comp.unit)}</span> {' '}
+                                  · Disp: <span className="font-medium text-foreground">{qtyWithUnit(comp.stockDisponible, comp.unit)}</span> {' '}
+                                  · Mín: <span className="font-medium text-foreground">{qtyWithUnit(comp.stockMinimo, comp.unit)}</span>
                                 </p>
                               )}
                               {bulkErrors[index] && (
@@ -434,7 +434,7 @@ export default function IngresoStock() {
                 </div>
                 <div className="w-full lg:w-32">
                   <Label>Cantidad</Label>
-                  <Input type="text" inputMode="numeric" value={egresoCant} onChange={(e) => setEgresoCant(e.target.value.replace(/\D/g, ''))} />
+                  <Input type="text" inputMode="numeric" placeholder="Cantidad" value={egresoCant} onChange={(e) => setEgresoCant(e.target.value.replace(/\D/g, ''))} />
                 </div>
                 <div className="flex-1 w-full">
                   <Label>Motivo (opcional)</Label>
@@ -452,9 +452,9 @@ export default function IngresoStock() {
 
               {selectedEgreso && (
                 <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md space-y-1">
-                  <p>Stock actual: <strong>{selectedEgreso.stockActual}</strong> {selectedEgreso.unit}</p>
-                  <p>Reservado: <strong>{selectedEgreso.stockReservado}</strong> {selectedEgreso.unit}</p>
-                  <p>Disponible: <strong>{selectedEgreso.stockDisponible}</strong> {selectedEgreso.unit}</p>
+                  <p>Stock actual: <strong>{qtyWithUnit(selectedEgreso.stockActual, selectedEgreso.unit)}</strong></p>
+                  <p>Reservado: <strong>{qtyWithUnit(selectedEgreso.stockReservado, selectedEgreso.unit)}</strong></p>
+                  <p>Disponible: <strong>{qtyWithUnit(selectedEgreso.stockDisponible, selectedEgreso.unit)}</strong></p>
                 </div>
               )}
             </div>

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { GoBack } from '@/components/shared/GoBack'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Pencil, Package, Armchair, AlertTriangle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, qtyWithUnit } from '@/lib/utils'
 
 export default function TipoSillaDetail() {
   const { id } = useParams()
@@ -31,10 +31,13 @@ export default function TipoSillaDetail() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <GoBack />
+      <GoBack to="/tipos-silla" />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">{tipo.name}</h1>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{tipo.name}</h1>
+          {tipo.tipo && <p className="text-sm text-muted-foreground">{tipo.tipo}</p>}
+        </div>
         {isAdmin && (
           <Link to={`/tipos-silla/${tipo._id}/editar`}>
             <Button variant="outline" size="sm"><Pencil size={16} className="mr-1" /> Editar</Button>
@@ -75,12 +78,29 @@ export default function TipoSillaDetail() {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Stock limitante</p>
-              {tipo.sillasPosibles === 0 && bom.length > 0 ? (
-                <p className="text-xs text-destructive flex items-center gap-1">
-                  <AlertTriangle size={12} /> Sin stock
+              {bom.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Sin BOM</p>
+              ) : (tipo.faltantes?.length ?? 0) > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertTriangle size={12} /> Faltan {tipo.faltantes.length} componente(s)
+                  </p>
+                  <ul className="text-xs text-destructive/90 space-y-0.5">
+                    {tipo.faltantes.map((f) => (
+                      <li key={f.name}>
+                        {f.name}: faltan {qtyWithUnit(f.faltante, f.unit)}
+                        <span className="text-muted-foreground"> (disp. {qtyWithUnit(f.disponible, f.unit)})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : tipo.limitante ? (
+                <p className="text-xs">
+                  <span className="font-medium text-foreground">{tipo.limitante.name}</span>
+                  <span className="text-muted-foreground"> · disp. {qtyWithUnit(tipo.limitante.stockDisponible, tipo.limitante.unit)}</span>
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground">Disponible</p>
+                <p className="text-xs font-medium text-green-600">{sillasPosibles} silla(s)</p>
               )}
             </div>
           </div>
@@ -130,7 +150,7 @@ export default function TipoSillaDetail() {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{item.quantity} {comp?.unit ?? ''}</TableCell>
+                      <TableCell className="text-right">{qtyWithUnit(item.quantity, comp?.unit)}</TableCell>
                     </TableRow>
                   )
                 })}

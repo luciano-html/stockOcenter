@@ -13,6 +13,11 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  const onOpenChangeRef = useRef(onOpenChange)
+
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+  })
 
   useEffect(() => {
     if (!open) return
@@ -22,7 +27,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        onOpenChange(false)
+        onOpenChangeRef.current(false)
         return
       }
       if (e.key === 'Tab' && contentRef.current) {
@@ -50,7 +55,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
       document.body.style.overflow = ''
       previouslyFocused?.focus()
     }
-  }, [open, onOpenChange])
+  }, [open])
 
   if (!open) return null
 

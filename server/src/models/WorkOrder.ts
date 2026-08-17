@@ -2,6 +2,11 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export type WorkOrderStatus = 'pendiente' | 'en_progreso' | 'pausada' | 'finalizada' | 'cancelada';
 
+export interface IWorkOrderSilla {
+  chairTypeId: Types.ObjectId;
+  quantity: number;
+}
+
 export interface IWorkOrderItem {
   componentId: Types.ObjectId;
   quantity: number;
@@ -9,8 +14,9 @@ export interface IWorkOrderItem {
 }
 
 export interface IWorkOrder extends Document {
+  sillas?: IWorkOrderSilla[];
   chairTypeId?: Types.ObjectId;
-  quantity: number;
+  quantity?: number;
   status: WorkOrderStatus;
   items?: IWorkOrderItem[];
   createdBy?: Types.ObjectId;
@@ -18,11 +24,20 @@ export interface IWorkOrder extends Document {
   startedBy?: Types.ObjectId;
   startedAt?: Date;
   finalizedBy?: Types.ObjectId;
+  assignedTo?: Types.ObjectId;
   operatorNotes?: string;
   createdAt: Date;
   updatedAt: Date;
   finalizedAt?: Date;
 }
+
+const workOrderSillaSchema = new Schema<IWorkOrderSilla>(
+  {
+    chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: true },
+    quantity: { type: Number, required: true, min: 1 },
+  },
+  { _id: false }
+);
 
 const workOrderItemSchema = new Schema<IWorkOrderItem>(
   {
@@ -35,8 +50,9 @@ const workOrderItemSchema = new Schema<IWorkOrderItem>(
 
 const workOrderSchema = new Schema<IWorkOrder>(
   {
+    sillas: { type: [workOrderSillaSchema] },
     chairTypeId: { type: Schema.Types.ObjectId, ref: 'ChairType', required: false, index: true },
-    quantity: { type: Number, required: true, min: 1 },
+    quantity: { type: Number, required: false, min: 1 },
     items: { type: [workOrderItemSchema] },
     status: {
       type: String,
@@ -50,6 +66,7 @@ const workOrderSchema = new Schema<IWorkOrder>(
     startedBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     startedAt: { type: Date },
     finalizedBy: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    assignedTo: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     operatorNotes: { type: String, trim: true },
     finalizedAt: { type: Date },
   },

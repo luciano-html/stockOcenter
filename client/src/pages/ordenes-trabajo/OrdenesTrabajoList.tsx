@@ -11,8 +11,9 @@ import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Eye, Play, Pause, RotateCcw, XCircle, Search, RotateCcw as ClearIcon } from 'lucide-react'
+import { Plus, Eye, Play, Pause, RotateCcw, XCircle, Search, RotateCcw as ClearIcon, Clock, CheckCircle2, ClipboardList } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getOrdenSillas, getOrdenSillasLabel, getOrdenSillasTotal } from '@/lib/ordenes'
 import { GoBack } from '@/components/shared/GoBack'
 
 const statusLabels: Record<string, string> = {
@@ -22,6 +23,15 @@ const statusLabels: Record<string, string> = {
   finalizada: 'Finalizada',
   cancelada: 'Cancelada',
 }
+
+const statusTabs: { value: string; label: string; icon: React.ElementType; color?: string }[] = [
+  { value: '', label: 'Todas', icon: ClipboardList },
+  { value: 'pendiente', label: 'Pendiente', icon: Clock, color: 'text-gray-600' },
+  { value: 'en_progreso', label: 'En progreso', icon: Play, color: 'text-blue-600' },
+  { value: 'pausada', label: 'Pausada', icon: Pause, color: 'text-amber-600' },
+  { value: 'finalizada', label: 'Finalizada', icon: CheckCircle2, color: 'text-green-600' },
+  { value: 'cancelada', label: 'Cancelada', icon: XCircle, color: 'text-destructive' },
+]
 
 const statusClass: Record<string, string> = {
   pendiente: 'bg-gray-100 text-gray-700 border-gray-300',
@@ -78,6 +88,16 @@ export default function OrdenesTrabajoList() {
     queryFn: () => api.get('/tipos-silla', { params: { limit: 1000 } }).then((r) => r.data),
   })
 
+  const { data: countsData } = useQuery<{ data: Record<string, number> }>({
+    queryKey: ['ordenes-trabajo', 'counts'],
+    queryFn: () => api.get('/ordenes-trabajo/counts').then((r) => r.data),
+  })
+
+  const totalCount = useMemo(
+    () => Object.values(countsData?.data ?? {}).reduce((sum, n) => sum + n, 0),
+    [countsData]
+  )
+
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
       api.patch(`/ordenes-trabajo/${id}/estado`, { status }),
@@ -101,14 +121,14 @@ export default function OrdenesTrabajoList() {
     let rows = data?.data ?? []
 
     if (tipoSillaFiltro === 'none') {
-      rows = rows.filter((ot) => !ot.chairTypeId)
+      rows = rows.filter((ot) => getOrdenSillas(ot).length === 0)
     }
 
     const term = busqueda.trim().toLowerCase()
     if (!term) return rows
     return rows.filter((ot) => {
       const matchId = ot._id.toLowerCase().includes(term) || ot._id.slice(-6).includes(term)
-      const matchSilla = ot.chairTypeId?.name?.toLowerCase().includes(term)
+      const matchSilla = getOrdenSillasLabel(ot).toLowerCase().includes(term)
       return matchId || matchSilla
     })
   }, [data, busqueda, tipoSillaFiltro])
@@ -126,7 +146,7 @@ export default function OrdenesTrabajoList() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/" />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Órdenes de trabajo</h1>
         {isAdmin && (
@@ -146,6 +166,30 @@ export default function OrdenesTrabajoList() {
           {errorMsg}
         </div>
       )}
+
+      <div className="flex border-b flex-wrap">
+        {statusTabs.map((tab) => {
+          const isActive = estadoFiltro === tab.value
+          const count = tab.value === '' ? totalCount : countsData?.data[tab.value] ?? 0
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => { setEstadoFiltro(tab.value); setPage(1) }}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <tab.icon size={16} className={cn(isActive && tab.color)} />
+              <span className={cn(isActive && tab.color)}>{tab.label}</span>
+              <span className={cn('text-xs', isActive ? 'opacity-70' : 'text-muted-foreground/70')}>({count})</span>
+            </button>
+          )
+        })}
+      </div>
 
       <div className="flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
@@ -187,6 +231,7 @@ export default function OrdenesTrabajoList() {
               <TableHead>Tipo de silla</TableHead>
               <TableHead>Cantidad</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Operario</TableHead>
               <TableHead>Creada</TableHead>
               <TableHead className="w-40 text-right">Acciones</TableHead>
             </TableRow>
@@ -197,12 +242,15 @@ export default function OrdenesTrabajoList() {
               return (
                 <TableRow key={ot._id}>
                   <TableCell className="text-xs font-mono text-muted-foreground">#{ot._id.slice(-6)}</TableCell>
-                  <TableCell className="font-medium">{ot.chairTypeId?.name ?? 'Solo repuestos'}</TableCell>
-                  <TableCell>{ot.quantity}</TableCell>
+                  <TableCell className="font-medium">{getOrdenSillasLabel(ot)}</TableCell>
+                  <TableCell>{getOrdenSillasTotal(ot)}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={statusClass[ot.status]}>
                       {statusLabels[ot.status]}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {ot.assignedTo ? ot.assignedTo.name : <span className="text-muted-foreground/70">Sin asignar</span>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(ot.createdAt).toLocaleDateString()}
@@ -234,7 +282,7 @@ export default function OrdenesTrabajoList() {
             })}
             {ordenesFiltradas.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   {hasFilters ? 'No hay órdenes que coincidan con los filtros' : 'Sin órdenes de trabajo'}
                 </TableCell>
               </TableRow>

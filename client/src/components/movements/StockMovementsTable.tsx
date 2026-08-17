@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { StockMovement, Componente, Pagination } from '@/types'
+import { getMovimientoSillasLabel } from '@/lib/ordenes'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,7 @@ function getReferenceLabel(m: StockMovement) {
   const ref = m.referenceId
   const workOrderId = typeof ref === 'string' ? ref : ref._id
   const shortId = workOrderId.slice(-6)
-  const chairName = typeof ref === 'object' && ref ? ref.chairTypeId?.name : undefined
+  const chairName = typeof ref === 'object' && ref ? getMovimientoSillasLabel(ref) : undefined
 
   const label = chairName ? `${chairName} · OT #${shortId}` : `OT #${shortId}`
 
@@ -132,7 +133,7 @@ export default function StockMovementsTable({
                 </TableCell>
                 <TableCell className="font-medium">
                   {m.componentId?.name ?? (m.referenceType === 'work-order'
-                    ? (typeof m.referenceId === 'object' && m.referenceId?.chairTypeId?.name) || 'Orden de trabajo'
+                    ? (typeof m.referenceId === 'object' && m.referenceId ? getMovimientoSillasLabel(m.referenceId) : undefined) || 'Orden de trabajo'
                     : '—')}
                   {m.componentId?.subtipo ? (
                     <span className="text-xs text-muted-foreground ml-1">({m.componentId.subtipo})</span>

@@ -7,12 +7,17 @@ import { createAuditLog } from '../services/auditService';
 
 export async function reservas(_req: Request, res: Response) {
   const ordenes = await WorkOrder.find({ status: { $in: ['en_progreso', 'pausada'] } })
+    .populate('sillas.chairTypeId', 'name')
     .populate('chairTypeId', 'name')
     .lean();
 
   const chairTypeIds = ordenes
-    .map((ot) => (ot.chairTypeId as unknown as { _id: string })?._id)
-    .filter(Boolean);
+    .flatMap((ot) => {
+      const ids = ot.sillas?.map((s) => (s.chairTypeId as unknown as { _id: string })?._id) ?? [];
+      const legacy = (ot.chairTypeId as unknown as { _id: string })?._id;
+      return [...ids, legacy];
+    })
+    .filter((id) => !!id);
 
   const [bomItems, components] = await Promise.all([
     BOMItem.find({ chairTypeId: { $in: chairTypeIds } })
@@ -39,12 +44,21 @@ export async function reservas(_req: Request, res: Response) {
   > = {};
 
   for (const ot of ordenes) {
-    const sillaName = ot.chairTypeId
-      ? (ot.chairTypeId as unknown as { name: string }).name
-      : 'Solo repuestos';
+    const sillas =
+      ot.sillas && ot.sillas.length > 0
+        ? ot.sillas
+        : ot.chairTypeId
+          ? [{ chairTypeId: ot.chairTypeId, quantity: ot.quantity ?? 1 }]
+          : [];
 
-    if (ot.chairTypeId) {
-      const chairId = (ot.chairTypeId as unknown as { _id: string })._id.toString();
+    const sillaLabels = sillas.map((s) => {
+      const name = (s.chairTypeId as unknown as { name?: string })?.name ?? 'Silla';
+      return `${name} x${s.quantity}`;
+    });
+    const sillaName = sillaLabels.length > 0 ? sillaLabels.join(', ') : 'Solo repuestos';
+
+    for (const silla of sillas) {
+      const chairId = (silla.chairTypeId as unknown as { _id: string })._id.toString();
       const bom = bomMap.get(chairId) ?? [];
       for (const item of bom) {
         const comp = componentMap.get((item.componentId as unknown as { _id: string })._id.toString());
@@ -53,8 +67,8 @@ export async function reservas(_req: Request, res: Response) {
         if (!resultado[key]) {
           resultado[key] = { componente: { _id: key, name: comp.name }, cantidadReservada: 0, ordenes: [] };
         }
-        resultado[key].cantidadReservada += item.quantity * ot.quantity;
-        resultado[key].ordenes.push({ id: ot._id.toString(), silla: sillaName, cantidad: ot.quantity });
+        resultado[key].cantidadReservada += item.quantity * silla.quantity;
+        resultado[key].ordenes.push({ id: ot._id.toString(), silla: sillaName, cantidad: silla.quantity });
       }
     }
 
@@ -186,11 +200,37 @@ export async function remove(req: Request, res: Response) {
   res.json({ data: componente });
 }
 
-export async function filtros(_req: Request, res: Response) {
-  const [tipos, subTipos, marcas] = await Promise.all([
-    Component.distinct('tipo', { tipo: { $ne: null } }),
-    Component.distinct('subtipo', { subtipo: { $ne: null } }),
-    Component.distinct('marca', { marca: { $ne: null } }),
+export async function filtros(req: Request, res: Response) {
+  const { tipo, subtipo, marca } = req.query as { tipo?: string; subtipo?: string; marca?: string };
+
+  const scope: Record<string, unknown> = {};
+  if (tipo) scope.tipo = tipo;
+  if (subtipo) scope.subtipo = subtipo;
+  if (marca) scope.marca = marca;
+
+  const fieldQuery = (field: 'tipo' | 'subtipo' | 'marca', value?: string) => ({
+    ...scope,
+    ...(value ? { [field]: value } : { [field]: { $ne: null } }),
+  });
+
+  const { tipo: _tipo, ...countScope } = scope;
+
+  const [tipos, subTipos, marcas, tiposCount] = await Promise.all([
+    Component.distinct('tipo', fieldQuery('tipo', tipo)),
+    Component.distinct('subtipo', fieldQuery('subtipo', subtipo)),
+    Component.distinct('marca', fieldQuery('marca', marca)),
+    Component.aggregate([
+      { $match: { ...countScope, tipo: { $nin: [null, ''] } } },
+      { $group: { _id: '$tipo', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]),
   ]);
-  res.json({ data: { tipos: tipos.sort(), subTipos: subTipos.sort(), marcas: marcas.sort() } });
+  res.json({
+    data: {
+      tipos: tipos.sort(),
+      subTipos: subTipos.sort(),
+      marcas: marcas.sort(),
+      tiposCount: tiposCount.map((r) => ({ tipo: r._id, count: r.count })),
+    },
+  });
 }

@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Plus, Pencil, Trash2, Search, Eye, AlertTriangle } from 'lucide-react'
-import { useState } from 'react'
+import { Plus, Pencil, Trash2, Search, Eye, AlertTriangle, Package } from 'lucide-react'
+import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { GoBack } from '@/components/shared/GoBack'
 
@@ -45,8 +45,14 @@ export default function ComponentesList() {
   })
 
   const { data: filtrosData } = useQuery<{ data: ComponenteFiltros }>({
-    queryKey: ['componentes-filtros'],
-    queryFn: () => api.get('/componentes/filtros').then((r) => r.data),
+    queryKey: ['componentes-filtros', tipoFiltro, subtipoFiltro, marcaFiltro],
+    queryFn: () => api.get('/componentes/filtros', {
+      params: {
+        tipo: tipoFiltro || undefined,
+        subtipo: subtipoFiltro || undefined,
+        marca: marcaFiltro || undefined,
+      },
+    }).then((r) => r.data),
   })
 
   const { data: resumenData } = useQuery<{ data: StockResumen }>({
@@ -69,6 +75,22 @@ export default function ComponentesList() {
 
   const reservas = reservasData?.data ?? []
   const stockBajoCount = (resumenData?.data.componentes ?? []).filter((c) => c.stockBajo).length
+
+  const totalTipos = useMemo(
+    () => (filtrosData?.data.tiposCount ?? []).reduce((sum, t) => sum + t.count, 0),
+    [filtrosData]
+  )
+
+  function updateParam(key: string, value: string) {
+    const next = new URLSearchParams(params)
+    if (value) {
+      next.set(key, value)
+    } else {
+      next.delete(key)
+    }
+    next.delete('page')
+    setParams(next, { replace: true })
+  }
 
   function clearFilters() {
     const next = new URLSearchParams()
@@ -94,7 +116,7 @@ export default function ComponentesList() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/" />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Componentes</h1>
         {isAdmin && (
@@ -102,6 +124,43 @@ export default function ComponentesList() {
             <Button className="bg-green-600 hover:bg-green-700 text-white"><Plus size={16} className="mr-1" /> Nuevo componente</Button>
           </Link>
         )}
+      </div>
+
+      <div className="flex border-b flex-wrap">
+        <button
+          type="button"
+          onClick={() => updateParam('tipo', '')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            tipoFiltro === ''
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Package size={16} />
+          <span>Todas</span>
+          <span className={cn('text-xs', tipoFiltro === '' ? 'opacity-70' : 'text-muted-foreground/70')}>({totalTipos})</span>
+        </button>
+        {(filtrosData?.data.tiposCount ?? []).map((t) => {
+          const isActive = tipoFiltro === t.tipo
+          return (
+            <button
+              key={t.tipo}
+              type="button"
+              onClick={() => updateParam('tipo', t.tipo)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                isActive
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Package size={16} />
+              <span>{t.tipo}</span>
+              <span className={cn('text-xs', isActive ? 'opacity-70' : 'text-muted-foreground/70')}>({t.count})</span>
+            </button>
+          )
+        })}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">

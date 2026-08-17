@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/services/api'
 import type { AuditLog, AuditAction, User, Pagination } from '@/types'
@@ -31,6 +32,7 @@ const actionLabels: Record<AuditAction, string> = {
   work_order_updated: 'OT actualizada',
   work_order_status_changed: 'Cambio de estado OT',
   work_order_finished: 'OT finalizada',
+  work_order_assigned: 'OT asignada',
 }
 
 const actionOptions: AuditAction[] = [
@@ -53,12 +55,145 @@ const actionOptions: AuditAction[] = [
   'work_order_updated',
   'work_order_status_changed',
   'work_order_finished',
+  'work_order_assigned',
 ]
 
 const severityClass: Record<string, string> = {
   info: 'bg-blue-100 text-blue-700 border-blue-300',
   warning: 'bg-amber-100 text-amber-700 border-amber-300',
   error: 'bg-red-100 text-red-700 border-red-300',
+}
+
+const statusLabels: Record<string, string> = {
+  pendiente: 'Pendiente',
+  en_progreso: 'En progreso',
+  pausada: 'Pausada',
+  finalizada: 'Finalizada',
+  cancelada: 'Cancelada',
+}
+
+function formatValue(v: unknown): string {
+  if (Array.isArray(v)) return `${v.length} ítem(s)`
+  if (v && typeof v === 'object') return Object.keys(v as object).join(', ')
+  return String(v ?? '—')
+}
+
+function orderTag(orderId: unknown): string {
+  return `#${String(orderId ?? '').slice(-6)}`
+}
+
+function sillasList(sillas: unknown): string {
+  if (Array.isArray(sillas)) return sillas.join(', ')
+  if (typeof sillas === 'string' && sillas) return sillas
+  return ''
+}
+
+function MetadataDetail({ log }: { log: AuditLog }) {
+  const m = log.metadata ?? {}
+  const rows: { label: string; value: ReactNode }[] = []
+
+  switch (log.action) {
+    case 'login_success':
+      rows.push({ label: 'Usuario', value: `${m.username} (${m.role ?? '—'})` })
+      break
+    case 'login_failed':
+      rows.push({ label: 'Usuario', value: m.username ?? '—' })
+      rows.push({ label: 'Motivo', value: m.reason === 'user_not_found_or_inactive' ? 'No existe o inactivo' : m.reason === 'invalid_password' ? 'Contraseña incorrecta' : (m.reason as string) })
+      break
+    case 'user_created':
+      rows.push({ label: 'Usuario creado', value: `${m.createdUsername} (${m.createdRole})` })
+      break
+    case 'user_deleted':
+      rows.push({ label: 'Usuario eliminado', value: `${m.deletedUsername} (${m.deletedRole})` })
+      break
+    case 'profile_updated':
+      rows.push({ label: 'Campos actualizados', value: Array.isArray(m.changedFields) ? m.changedFields.join(', ') : '—' })
+      break
+    case 'stock_ingreso':
+    case 'stock_egreso':
+      rows.push({ label: 'Componente', value: m.componentName ?? '—' })
+      rows.push({ label: 'Cantidad', value: String(m.quantity ?? '—') })
+      if (m.notes) rows.push({ label: 'Notas', value: m.notes as string })
+      break
+    case 'stock_ingreso_masivo': {
+      const items = Array.isArray(m.items) ? (m.items as Array<{ cantidad: number; notas?: string }>) : []
+      rows.push({ label: 'Componentes', value: `${items.length} ítem(s)` })
+      if (items.length > 0) {
+        rows.push({ label: 'Cantidades', value: items.map((i) => i.cantidad).join(', ') })
+      }
+      if (m.notasGenerales) rows.push({ label: 'Notas generales', value: m.notasGenerales as string })
+      break
+    }
+    case 'component_created':
+    case 'component_deleted':
+      rows.push({ label: 'Componente', value: m.name ?? '—' })
+      break
+    case 'component_updated':
+      rows.push({ label: 'Componente', value: m.name ?? '—' })
+      if (m.changes && typeof m.changes === 'object') {
+        rows.push({ label: 'Cambios', value: Object.entries(m.changes as Record<string, unknown>).map(([k, v]) => `${k}: ${formatValue(v)}`).join(' · ') })
+      }
+      break
+    case 'chair_type_created':
+    case 'chair_type_deleted':
+      rows.push({ label: 'Tipo de silla', value: m.name ?? '—' })
+      if (m.bomCount !== undefined) rows.push({ label: 'Componentes en BOM', value: String(m.bomCount) })
+      break
+    case 'chair_type_updated':
+      rows.push({ label: 'Tipo de silla', value: m.name ?? '—' })
+      if (m.bomCount !== undefined) rows.push({ label: 'Componentes en BOM', value: String(m.bomCount) })
+      if (m.changes && typeof m.changes === 'object') {
+        rows.push({ label: 'Cambios', value: Object.entries(m.changes as Record<string, unknown>).map(([k, v]) => `${k}: ${formatValue(v)}`).join(' · ') })
+      }
+      break
+    case 'work_order_created':
+    case 'work_order_updated': {
+      rows.push({ label: 'Orden de trabajo', value: orderTag(m.orderId) })
+      const sillas = sillasList(m.sillas)
+      if (sillas) rows.push({ label: 'Sillas', value: sillas })
+      break
+    }
+    case 'work_order_status_changed': {
+      rows.push({ label: 'Orden de trabajo', value: orderTag(m.orderId) })
+      const sillas = sillasList(m.sillas)
+      if (sillas) rows.push({ label: 'Sillas', value: sillas })
+      const anterior = statusLabels[String(m.previousStatus ?? '')] ?? String(m.previousStatus ?? '—')
+      const nuevo = statusLabels[String(m.newStatus ?? '')] ?? String(m.newStatus ?? '—')
+      rows.push({ label: 'Cambio de estado', value: `${anterior} → ${nuevo}` })
+      break
+    }
+    case 'work_order_finished': {
+      rows.push({ label: 'Orden de trabajo', value: orderTag(m.orderId) })
+      const sillas = sillasList(m.sillas)
+      if (sillas) rows.push({ label: 'Sillas', value: sillas })
+      if (m.notas) rows.push({ label: 'Notas', value: m.notas as string })
+      break
+    }
+    case 'work_order_assigned': {
+      rows.push({ label: 'Orden de trabajo', value: orderTag(m.orderId) })
+      const sillas = sillasList(m.sillas)
+      if (sillas) rows.push({ label: 'Sillas', value: sillas })
+      rows.push({ label: 'Asignado a', value: m.assignedName ? (m.assignedName as string) : 'Sin asignar' })
+      break
+    }
+    default:
+      break
+  }
+
+  if (rows.length === 0) {
+    return <p className="text-muted-foreground">Sin detalles</p>
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+      {rows.map((row) => (
+        <div key={row.label} className="flex gap-2 min-w-0">
+          <span className="font-medium text-muted-foreground whitespace-nowrap">{row.label}:</span>
+          <span className="min-w-0 break-words">{row.value}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function AuditLogs() {
@@ -181,8 +316,8 @@ export default function AuditLogs() {
                       {new Date(log.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {log.userId
-                        ? `${log.userId.username}`
+                      {log.userId && typeof log.userId === 'object'
+                        ? `${log.userId.name || log.userId.username}`
                         : log.username
                         ? `${log.username} (no autenticado)`
                         : '—'}
@@ -201,13 +336,10 @@ export default function AuditLogs() {
                     <TableRow className="bg-muted/30">
                       <TableCell colSpan={6} className="py-3">
                         <div className="text-sm space-y-2">
-                          <p><span className="font-medium">IP:</span> {log.ip ?? '—'}</p>
-                          <p><span className="font-medium">User Agent:</span> {log.userAgent ?? '—'}</p>
-                          <div>
-                            <p className="font-medium">Metadata:</p>
-                            <pre className="text-xs bg-background border rounded p-2 mt-1 overflow-x-auto">
-                              {JSON.stringify(log.metadata, null, 2)}
-                            </pre>
+                          <MetadataDetail log={log} />
+                          <div className="border-t pt-2 text-muted-foreground text-xs space-y-1">
+                            <p>IP: {log.ip ?? '—'}</p>
+                            <p>User Agent: {log.userAgent ?? '—'}</p>
                           </div>
                         </div>
                       </TableCell>

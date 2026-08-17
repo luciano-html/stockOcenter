@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IChairType extends Document {
   name: string;
+  tipo?: string;
   description?: string;
   imageUrl?: string;
   active: boolean;
@@ -12,6 +13,7 @@ export interface IChairType extends Document {
 const chairTypeSchema = new Schema<IChairType>(
   {
     name: { type: String, required: true, unique: true, trim: true },
+    tipo: { type: String, trim: true },
     description: { type: String, trim: true },
     imageUrl: { type: String, trim: true },
     active: { type: Boolean, required: true, default: true },

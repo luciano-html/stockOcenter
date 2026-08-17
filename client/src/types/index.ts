@@ -19,11 +19,13 @@ export interface ComponenteFiltros {
   tipos: string[]
   subTipos: string[]
   marcas: string[]
+  tiposCount?: { tipo: string; count: number }[]
 }
 
 export interface ChairType {
   _id: string
   name: string
+  tipo?: string
   description?: string
   imageUrl?: string
   active: boolean
@@ -36,16 +38,32 @@ export interface BOMItem {
   quantity: number
 }
 
+export interface BomDetalleItem {
+  componentId: { _id: string; name: string; unit: string; tipo?: string; subtipo?: string; marca?: string }
+  quantity: number
+  stockActual: number
+  stockReservado: number
+  stockDisponible: number
+}
+
 export interface ChairTypeWithBOM extends ChairType {
   bom: BOMItem[]
   bomCount?: number
   sillasPosibles?: number
+  limitante?: { name: string; unit?: string; stockDisponible: number; necesario: number } | null
+  faltantes?: { name: string; unit?: string; disponible: number; necesario: number; faltante: number }[]
+}
+
+export interface WorkOrderSilla {
+  chairTypeId: { _id: string; name: string }
+  quantity: number
 }
 
 export interface WorkOrder {
   _id: string
+  sillas?: WorkOrderSilla[]
   chairTypeId?: { _id: string; name: string }
-  quantity: number
+  quantity?: number
   status: 'pendiente' | 'en_progreso' | 'pausada' | 'finalizada' | 'cancelada'
   items?: { componentId: string; quantity: number; type: 'adicional' | 'repuesto' }[]
   createdBy?: { _id: string; name: string; role: string }
@@ -53,6 +71,7 @@ export interface WorkOrder {
   startedBy?: { _id: string; name: string; role: string }
   startedAt?: string
   finalizedBy?: { _id: string; name: string; role: string }
+  assignedTo?: { _id: string; name: string; role: string }
   operatorNotes?: string
   createdAt: string
   updatedAt: string
@@ -70,7 +89,9 @@ export interface StockMovement {
   type: 'ingreso' | 'egreso'
   quantity: number
   referenceType?: 'work-order'
-  referenceId?: { _id: string; chairTypeId?: { name: string }; quantity: number }
+  referenceId?:
+    | string
+    | { _id: string; chairTypeId?: { name: string }; quantity?: number; sillas?: WorkOrderSilla[] }
   notes?: string
   userId?: { _id: string; name: string; role: string }
   userRole?: 'admin' | 'operario'
@@ -146,6 +167,7 @@ export type AuditAction =
   | 'work_order_updated'
   | 'work_order_status_changed'
   | 'work_order_finished'
+  | 'work_order_assigned'
 
 export interface AuditLog {
   _id: string

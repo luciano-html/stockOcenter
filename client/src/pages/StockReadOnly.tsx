@@ -7,7 +7,7 @@ import { GoBack } from '@/components/shared/GoBack'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Package, AlertTriangle, CheckCircle, Armchair } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, qtyWithUnit } from '@/lib/utils'
 
 export default function StockReadOnly() {
   const { data: resumenData, isLoading } = useQuery<{ data: StockResumen }>({
@@ -22,7 +22,7 @@ export default function StockReadOnly() {
 
   return (
     <div className="space-y-6">
-      <GoBack />
+      <GoBack to="/" />
       <h1 className="text-2xl font-bold tracking-tight">Stock disponible</h1>
 
       <Card>
@@ -49,10 +49,10 @@ export default function StockReadOnly() {
                 {componentes.map((c) => (
                   <TableRow key={c._id} className={cn(c.stockBajo && 'bg-red-50/60')}>
                     <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="text-right">{c.stockActual} {c.unit}</TableCell>
-                    <TableCell className={cn('text-right', c.stockReservado > 0 && 'text-amber-600 font-bold')}>{c.stockReservado} {c.unit}</TableCell>
-                    <TableCell className="text-right font-medium">{c.stockDisponible} {c.unit}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{c.stockMinimo} {c.unit}</TableCell>
+                    <TableCell className="text-right">{qtyWithUnit(c.stockActual, c.unit)}</TableCell>
+                    <TableCell className={cn('text-right', c.stockReservado > 0 && 'text-amber-600 font-bold')}>{qtyWithUnit(c.stockReservado, c.unit)}</TableCell>
+                    <TableCell className="text-right font-medium">{qtyWithUnit(c.stockDisponible, c.unit)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{qtyWithUnit(c.stockMinimo, c.unit)}</TableCell>
                     <TableCell>
                       {c.stockBajo ? (
                         <Badge variant="destructive"><AlertTriangle size={12} className="mr-1" /> Bajo</Badge>

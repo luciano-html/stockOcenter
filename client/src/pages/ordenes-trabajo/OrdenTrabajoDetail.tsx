@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
-import type { WorkOrder, WorkOrderDetalle, AxiosErrorType } from '@/types'
+import type { WorkOrder, WorkOrderDetalle, AxiosErrorType, User as Usuario } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -10,11 +10,13 @@ import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { useState } from 'react'
-import { Play, Pause, CheckCircle, XCircle, Pencil, AlertTriangle, Clock, User, Calendar, RotateCcw } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Play, Pause, CheckCircle, XCircle, Pencil, AlertTriangle, Clock, User, Calendar, RotateCcw, ChevronDown } from 'lucide-react'
+import { cn, qtyWithUnit } from '@/lib/utils'
 import { GoBack } from '@/components/shared/GoBack'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { getOrdenSillas } from '@/lib/ordenes'
 import FinalizarOrdenModal from './FinalizarOrdenModal'
 
 const statusLabels: Record<string, string> = {
@@ -139,7 +141,9 @@ export default function OrdenTrabajoDetail() {
   const isAdmin = user?.role === 'admin'
   const [confirmStatus, setConfirmStatus] = useState<string | null>(null)
   const [statusNotes, setStatusNotes] = useState('')
+  const [selectedOperator, setSelectedOperator] = useState('')
   const [showFinalize, setShowFinalize] = useState(false)
+  const [showComponentes, setShowComponentes] = useState(false)
   const [stockError, setStockError] = useState<{ componentId: string; name: string; necesario: number; disponible: number }[] | null>(null)
 
   const { data, isLoading } = useQuery<{ data: WorkOrder }>({
@@ -174,6 +178,22 @@ export default function OrdenTrabajoDetail() {
     },
   })
 
+  const { data: usuariosData } = useQuery<{ data: Usuario[] }>({
+    queryKey: ['usuarios', 'asignar'],
+    queryFn: () => api.get('/auth/usuarios', { params: { limit: 1000 } }).then((r) => r.data),
+    enabled: isAdmin,
+  })
+
+  const assignMutation = useMutation({
+    mutationFn: ({ assignedTo }: { assignedTo: string | null }) =>
+      api.patch(`/ordenes-trabajo/${id}/asignar`, { assignedTo }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orden-trabajo', id] })
+      queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
+      queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+    },
+  })
+
   if (isLoading) return <Skeleton className="h-96" />
   if (!data?.data) return <p className="text-muted-foreground">Orden no encontrada</p>
 
@@ -181,10 +201,23 @@ export default function OrdenTrabajoDetail() {
   const actions = transitions[ot.status] ?? []
   const canFinalize = ['pendiente', 'en_progreso', 'pausada'].includes(ot.status)
   const canEdit = isAdmin && ot.status === 'pendiente'
+  const tieneSillas = getOrdenSillas(ot).length > 0
+
+  const empleados = (usuariosData?.data ?? []).filter((u) => u.role === 'operario')
+
+  function handleConfirm() {
+    if (!confirmStatus) return
+    const startFlow = () => mutation.mutate({ status: confirmStatus, notes: statusNotes || undefined })
+    if (confirmStatus === 'en_progreso' && !ot.assignedTo && selectedOperator) {
+      assignMutation.mutate({ assignedTo: selectedOperator }, { onSuccess: startFlow })
+    } else {
+      startFlow()
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <GoBack />
+      <GoBack to="/ordenes-trabajo" />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -202,13 +235,17 @@ export default function OrdenTrabajoDetail() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Tipo de silla</p>
-              <p className="font-medium">{ot.chairTypeId?.name ?? 'Solo repuestos'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Cantidad</p>
-              <p className="font-medium">{ot.quantity}</p>
+            <div className="col-span-2">
+              <p className="text-sm text-muted-foreground">Tipo(s) de silla</p>
+              {getOrdenSillas(ot).length === 0 ? (
+                <p className="font-medium">Solo repuestos</p>
+              ) : (
+                getOrdenSillas(ot).map((s) => (
+                  <p key={s.chairTypeId._id} className="font-medium">
+                    {s.chairTypeId.name} ×{s.quantity}
+                  </p>
+                ))
+              )}
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Creada</p>
@@ -220,6 +257,10 @@ export default function OrdenTrabajoDetail() {
                 <p className="font-medium">{new Date(ot.finalizedAt).toLocaleString()}</p>
               </div>
             )}
+            <div className="col-span-2 sm:col-span-1">
+              <p className="text-sm text-muted-foreground">Operario asignado</p>
+              <p className="font-medium">{ot.assignedTo ? ot.assignedTo.name : 'Sin asignar'}</p>
+            </div>
           </div>
 
           <OrderTimeline ot={ot} />
@@ -239,7 +280,7 @@ export default function OrdenTrabajoDetail() {
                 <Button
                   key={action.status}
                   className={cn(action.className, 'gap-2')}
-                  onClick={() => setConfirmStatus(action.status)}
+                  onClick={() => { setSelectedOperator(ot.assignedTo?._id ?? ''); setConfirmStatus(action.status) }}
                 >
                   <action.icon size={16} /> {action.label}
                 </Button>
@@ -259,37 +300,51 @@ export default function OrdenTrabajoDetail() {
 
       {detalleData?.data.items && detalleData.data.items.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Componentes</CardTitle></CardHeader>
-          <CardContent>
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Componente</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Sub-tipo</TableHead>
-                    <TableHead>Cantidad</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detalleData.data.items.map((item, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{item.componentId.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{item.componentId.tipo}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{item.componentId.subtipo ?? '—'}</TableCell>
-                      <TableCell>{item.quantity} {item.unit}</TableCell>
-                      <TableCell>
-                        {item.tipo === 'bom' && <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 bg-blue-50">Silla</Badge>}
-                        {item.tipo === 'adicional' && <Badge variant="outline" className="text-xs border-purple-300 text-purple-700 bg-purple-50">Adicional</Badge>}
-                        {item.tipo === 'repuesto' && <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">Repuesto</Badge>}
-                      </TableCell>
+          {tieneSillas ? (
+            <CardHeader
+              className="cursor-pointer select-none hover:bg-muted/50 transition-colors"
+              onClick={() => setShowComponentes((v) => !v)}
+            >
+              <div className="flex items-center justify-between w-full">
+                <CardTitle>Items</CardTitle>
+                <ChevronDown size={18} className={cn('text-muted-foreground transition-transform', !showComponentes && '-rotate-90')} />
+              </div>
+            </CardHeader>
+          ) : (
+            <CardHeader><CardTitle>Items</CardTitle></CardHeader>
+          )}
+          {(!tieneSillas || showComponentes) && (
+            <CardContent>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Componente</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Sub-tipo</TableHead>
+                      <TableHead>Cantidad</TableHead>
+                      <TableHead></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
+                  </TableHeader>
+                  <TableBody>
+                    {detalleData.data.items.map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{item.componentId.name}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{item.componentId.tipo}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{item.componentId.subtipo ?? '—'}</TableCell>
+                        <TableCell>{qtyWithUnit(item.quantity, item.unit)}</TableCell>
+                        <TableCell>
+                          {item.tipo === 'bom' && <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 bg-blue-50">Silla</Badge>}
+                          {item.tipo === 'adicional' && <Badge variant="outline" className="text-xs border-purple-300 text-purple-700 bg-purple-50">Adicional</Badge>}
+                          {item.tipo === 'repuesto' && <Badge variant="outline" className="text-xs border-orange-300 text-orange-700 bg-orange-50">Repuesto</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
 
@@ -308,6 +363,21 @@ export default function OrdenTrabajoDetail() {
            confirmStatus === 'en_progreso' ? 'Se reservará el stock necesario.' :
            'La orden se pausará, la reserva de stock se mantiene.'}
         </p>
+        {confirmStatus === 'en_progreso' && !ot.assignedTo && (
+          <div className="space-y-2 mb-4">
+            <Label htmlFor="assignOperator">Asignar operario</Label>
+            <Select
+              id="assignOperator"
+              value={selectedOperator}
+              onChange={(e) => setSelectedOperator(e.target.value)}
+            >
+              <option value="">Seleccioná un operario...</option>
+              {empleados.map((u) => (
+                <option key={u.id} value={u.id}>{u.name || u.username} ({u.role})</option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div className="space-y-3 mb-4">
           <Label htmlFor="statusNotes">Notas (opcional)</Label>
           <Input
@@ -326,10 +396,10 @@ export default function OrdenTrabajoDetail() {
               confirmStatus === 'pausada' && 'bg-amber-500 hover:bg-amber-600 text-white',
               confirmStatus === 'finalizada' && 'bg-green-600 hover:bg-green-700 text-white'
             )}
-            onClick={() => confirmStatus && mutation.mutate({ status: confirmStatus, notes: statusNotes || undefined })}
-            disabled={mutation.isPending}
+            onClick={handleConfirm}
+            disabled={mutation.isPending || assignMutation.isPending || (confirmStatus === 'en_progreso' && !ot.assignedTo && !selectedOperator)}
           >
-            {mutation.isPending ? 'Procesando...' : 'Confirmar'}
+            {mutation.isPending || assignMutation.isPending ? 'Procesando...' : 'Confirmar'}
           </Button>
         </div>
       </Dialog>

@@ -9,22 +9,24 @@ import type { ChairTypeWithBOM, Componente } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Autocomplete } from '@/components/ui/autocomplete'
+import { MultiSelectAutocomplete } from '@/components/ui/multi-select-autocomplete'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Plus, Trash2, AlertTriangle, Upload, X } from 'lucide-react'
 import { GoBack } from '@/components/shared/GoBack'
+import { qtyWithUnit } from '@/lib/utils'
 
 const schema = z.object({
   name: z.string().min(1, 'Requerido'),
+  tipo: z.string().optional(),
   description: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
 
-interface BOMEntry { componentId: string; quantity: number }
+interface BOMEntry { componentId: string; quantity: string }
 
 export default function TipoSillaForm() {
   const { id } = useParams()
@@ -33,8 +35,8 @@ export default function TipoSillaForm() {
   const queryClient = useQueryClient()
   const [showConfirm, setShowConfirm] = useState(false)
   const [bom, setBom] = useState<BOMEntry[]>([])
-  const [selectedComponent, setSelectedComponent] = useState('')
-  const [selectedQty, setSelectedQty] = useState(1)
+  const [multiSelected, setMultiSelected] = useState<string[]>([])
+  const [bomError, setBomError] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
 
@@ -71,7 +73,7 @@ export default function TipoSillaForm() {
     () =>
       (compData?.data ?? []).map((c) => ({
         value: c._id,
-        label: `${c.name} (${c.unit})`,
+        label: `${c.name} (${c.tipo}${c.subtipo ? ` / ${c.subtipo}` : ''}${c.marca ? ` - ${c.marca}` : ''}) — disp. ${qtyWithUnit(c.stockDisponible, c.unit)}`,
       })),
     [compData]
   )
@@ -91,7 +93,7 @@ export default function TipoSillaForm() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    values: isEdit && tipoData ? { name: tipoData.data.name, description: tipoData.data.description ?? '' } : undefined,
+    values: isEdit && tipoData ? { name: tipoData.data.name, tipo: tipoData.data.tipo ?? '', description: tipoData.data.description ?? '' } : undefined,
   })
 
   useEffect(() => {
@@ -101,27 +103,55 @@ export default function TipoSillaForm() {
         setBom(
           tipoData.data.bom.map((b) => ({
             componentId: typeof b.componentId === 'string' ? b.componentId : b.componentId._id,
-            quantity: b.quantity,
+            quantity: String(b.quantity),
           }))
         )
       }
     }
   }, [isEdit, tipoData])
 
-  function addBOM() {
-    if (!selectedComponent || bom.find((b) => b.componentId === selectedComponent)) return
-    setBom([...bom, { componentId: selectedComponent, quantity: selectedQty }])
-    setSelectedComponent('')
-    setSelectedQty(1)
+  function addMultiSelectedToBOM() {
+    const existingIds = new Set(bom.map((b) => b.componentId))
+    const newEntries = multiSelected
+      .filter((id) => !existingIds.has(id))
+      .map((id) => ({ componentId: id, quantity: '1' }))
+
+    if (newEntries.length === 0) {
+      setBomError('Los componentes seleccionados ya están en la lista de materiales')
+      setTimeout(() => setBomError(''), 3000)
+      return
+    }
+
+    setBom((prev) => [...prev, ...newEntries])
+    setMultiSelected([])
+    setBomError('')
+  }
+
+  function updateBOMQuantity(componentId: string, value: string) {
+    setBom((prev) => prev.map((b) => (b.componentId === componentId ? { ...b, quantity: value } : b)))
   }
 
   function removeBOM(componentId: string) {
     setBom(bom.filter((b) => b.componentId !== componentId))
   }
 
+  function handleSaveRequest() {
+    const invalid = bom.some((b) => !b.componentId || Number(b.quantity) < 1 || b.quantity === '')
+    if (invalid) {
+      setBomError('La cantidad de cada componente debe ser al menos 1')
+      setTimeout(() => setBomError(''), 3000)
+      return
+    }
+    setShowConfirm(true)
+  }
+
   const mutation = useMutation({
     mutationFn: (form: FormData) => {
-      const payload = { ...form, bom, imageUrl: imageUrl || undefined }
+      const payload = {
+        ...form,
+        bom: bom.map((b) => ({ componentId: b.componentId, quantity: Number(b.quantity) })),
+        imageUrl: imageUrl || undefined,
+      }
       return isEdit ? api.put(`/tipos-silla/${id}`, payload) : api.post('/tipos-silla', payload)
     },
     onSuccess: (res) => {
@@ -134,7 +164,7 @@ export default function TipoSillaForm() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/tipos-silla" />
     <Card className="max-w-2xl mx-auto">
       <CardHeader><CardTitle>{isEdit ? 'Editar tipo de silla' : 'Nuevo tipo de silla'}</CardTitle></CardHeader>
       <CardContent className="space-y-6">
@@ -143,6 +173,10 @@ export default function TipoSillaForm() {
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" {...register('name')} />
             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tipo">Tipo</Label>
+            <Input id="tipo" {...register('tipo')} placeholder="Ej: Apilable, Fija, Reclinable..." />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Descripción</Label>
@@ -197,35 +231,40 @@ export default function TipoSillaForm() {
               </Button>
             )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex-1">
-              <Autocomplete
+          <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
+            <div className="flex-1 w-full">
+              <MultiSelectAutocomplete
                 options={componentOptions}
-                value={selectedComponent}
-                onChange={setSelectedComponent}
-                placeholder="Buscar componente..."
+                selected={multiSelected}
+                onChange={setMultiSelected}
+                placeholder="Escribí para filtrar y marcá con checkbox..."
               />
             </div>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="Cant."
-              className="w-24"
-              value={selectedQty}
-              onChange={(e) => setSelectedQty(Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))}
-            />
-            <Button type="button" variant="outline" onClick={addBOM} disabled={!selectedComponent || selectedQty < 1}>
-              <Plus size={16} className="mr-1" /> Agregar
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full lg:w-auto whitespace-nowrap"
+              disabled={multiSelected.length === 0}
+              onClick={addMultiSelectedToBOM}
+            >
+              <Plus size={16} className="mr-1" />
+              Agregar {multiSelected.length > 0 ? `${multiSelected.length}` : ''}
             </Button>
           </div>
 
+          {bomError && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
+              {bomError}
+            </div>
+          )}
+
           {bom.length > 0 && (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Componente</TableHead>
-                    <TableHead>Cantidad</TableHead>
+                    <TableHead className="w-32">Cantidad</TableHead>
                     <TableHead className="w-24">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -237,15 +276,30 @@ export default function TipoSillaForm() {
                       <TableRow key={b.componentId} className={isOrphan ? 'bg-amber-50' : undefined}>
                         <TableCell>
                           {comp ? (
-                            <span className="font-medium">{comp.name}</span>
+                            <div>
+                              <span className="font-medium">{comp.name}</span>
+                              <p className="text-xs text-muted-foreground">
+                                Stock: <span className="font-medium text-foreground">{qtyWithUnit(comp.stockActual, comp.unit)}</span> · Disp:{' '}
+                                <span className="font-medium text-foreground">{qtyWithUnit(comp.stockDisponible, comp.unit)}</span> · Mín:{' '}
+                                <span className="font-medium text-foreground">{qtyWithUnit(comp.stockMinimo, comp.unit)}</span>
+                              </p>
+                            </div>
                           ) : (
                             <span className="text-amber-700 text-sm">
                               Componente no encontrado <span className="font-mono text-xs">({b.componentId})</span>
                             </span>
                           )}
                         </TableCell>
-                        <TableCell>{b.quantity}</TableCell>
-                        <TableCell>
+                        <TableCell className="align-top">
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Cantidad"
+                            value={b.quantity}
+                            onChange={(e) => updateBOMQuantity(b.componentId, e.target.value.replace(/\D/g, ''))}
+                          />
+                        </TableCell>
+                        <TableCell className="align-top">
                           <div className="flex gap-1">
                             <Button variant="ghost" size="icon" onClick={() => removeBOM(b.componentId)}>
                               <Trash2 size={16} className="text-destructive" />
@@ -263,7 +317,7 @@ export default function TipoSillaForm() {
 
           <div className="flex gap-2 justify-end">
             <Button type="button" variant="outline" onClick={() => navigate('/tipos-silla')}>Cancelar</Button>
-            <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>
+            <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleSaveRequest} disabled={mutation.isPending}>
              {mutation.isPending ? 'Guardando...' : 'Guardar'}
             </Button>
           </div>

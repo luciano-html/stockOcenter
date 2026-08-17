@@ -25,7 +25,14 @@ export async function list(req: Request, res: Response) {
   const movimientos = await StockMovement.find(filter)
     .populate('componentId', 'name unit tipo subtipo marca')
     .populate('userId', 'name role')
-    .populate({ path: 'referenceId', select: 'chairTypeId quantity', populate: { path: 'chairTypeId', select: 'name' } })
+    .populate({
+      path: 'referenceId',
+      select: 'sillas chairTypeId quantity',
+      populate: [
+        { path: 'sillas.chairTypeId', select: 'name' },
+        { path: 'chairTypeId', select: 'name' },
+      ],
+    })
     .sort({ createdAt: -1 })
     .skip(getSkip(pageNum, limitNum))
     .limit(limitNum)

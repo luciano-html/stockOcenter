@@ -71,7 +71,7 @@ export default function UsuariosList() {
 
   return (
     <div className="space-y-4">
-      <GoBack />
+      <GoBack to="/" />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
         {activeTab === 'usuarios' && (
