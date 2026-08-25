@@ -151,9 +151,9 @@ function OrderTimeline({ ot }: { ot: WorkOrder }) {
                     {step.user.name} ({step.user.role})
                   </p>
                 )}
-                {step.notes && (
+                {'notes' in step && step.notes && (
                   <p className="text-xs mt-1 bg-amber-50 text-amber-900 border border-amber-200 rounded px-2 py-1">
-                    {step.notes}
+                    {step.notes as string}
                   </p>
                 )}
               </div>

@@ -97,6 +97,8 @@ Cuando el equipo decide cambiar algo (ej. migrar de `express-validator` a `zod`)
 | 09 | Paleta oficial colores y fonts | `docs/sdd/09-paleta-oficial-colores.md` |
 | 10 | Auditoría técnica: rendimiento, seguridad y mejoras | `docs/sdd/10-auditoria-rendimiento-seguridad.md` |
 | 11 | Correctivos de rendimiento y seguridad | `docs/sdd/11-correctivos-rendimiento-seguridad.md` |
+| 12 | Conventional Commits | `docs/sdd/12-conventional-commits.md` |
+| 13 | Mejoras UI/UX, Wizard y Stock Avanzado | `docs/sdd/13-mejoras-ui-ux-wizard.md` |
 
 ---
 

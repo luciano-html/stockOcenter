@@ -63,10 +63,19 @@
 | 09 | Paleta oficial colores y fonts | `docs/sdd/09-paleta-oficial-colores.md` |
 | 10 | Auditoría técnica: rendimiento, seguridad y mejoras | `docs/sdd/10-auditoria-rendimiento-seguridad.md` |
 | 11 | Correctivos de rendimiento y seguridad | `docs/sdd/11-correctivos-rendimiento-seguridad.md` |
+| 12 | Conventional Commits | `docs/sdd/12-conventional-commits.md` |
+| 13 | Mejoras UI/UX, Wizard y Stock Avanzado | `docs/sdd/13-mejoras-ui-ux-wizard.md` |
 
 ---
 
 ## Changelog
+
+### 2026-08-24: Mejoras UI/UX, Wizard de BOM y Stock Avanzado
+- **UI/UX**: Implementación del rediseño en 4 fases (movimientos, alertas, sidebar, órdenes de trabajo, componentes y tipos de silla). Incorporación de badges semánticos, tags y filas expandibles.
+- **Features**: Wizard paso a paso para BOM de giratorias, cálculo de sillas posibles con faltantes, tabs por tipo y filtros encadenados.
+- **Images**: Soporte para subida de imágenes vinculadas a tipos de silla.
+- **Audit**: Agregados logs de actividad en sección usuarios (backend + frontend).
+- **SDD**: Creado doc #13 detallando las mejoras de UI y nuevas lógicas. Actualizados `SDD.md` y `STATUS.md`.
 
 ### 2026-06-28: Auditoría técnica completa — rendimiento, seguridad y mejoras
 - **Audit**: Revisión completa de backend (`server/src/**`) y frontend (`client/src/**`).
@@ -131,26 +140,17 @@
 
 ## Última sesión
 
-> Bugs corregidos y dashboard rediseñado. El sistema está corriendo en dev.
+> Documentación de las últimas grandes características y rediseños implementados. El sistema está corriendo en dev.
 
-**Sesión:** 2026-07-05
+**Sesión:** 2026-08-24
 **Cambios principales:**
-- BOM de tipos de silla: validación backend, limpieza de huérfanos, Autocomplete en editor y manejo de componentes faltantes.
-- Filtros de componentes (tipo/subtipo/marca/búsqueda) en listado de tipos de silla.
-- Eliminado ingreso unitario; ingreso masivo renombrado a "Cargar stock".
-- Reparado historial de movimientos: filtros sincronizados y búsqueda sin filtros funciona.
-- Órdenes de trabajo: diálogo de inicio maneja errores; si falta stock se muestra modal con faltantes.
-- Auditoría de OT: agregados `startedBy`/`startedAt`; detalle muestra creador, iniciador y finalizador.
-- Dashboard rediseñado con KPIs clickeables y kanban de órdenes.
-- Actualizado `STATUS.md`.
-
-**Verificación:**
-- [x] `npm run build` pasa en server.
-- [x] `npm run build` pasa en client.
-- [x] `npm test` pasa en server.
-- [x] Runtime probado: login, filtros de tipos de silla, limpieza de huérfanos, inicio de OT con falta de stock.
+- **UI/UX**: Implementación de 4 fases de rediseño mejorando el layout, sidebar, componentes, órdenes y alertas.
+- **Wizard y BOM**: Wizard paso a paso para el armado de lista de materiales de sillas giratorias.
+- **Lógica de Stock**: Cálculo de sillas posibles con reporte de faltantes; filtros encadenados.
+- **Imágenes**: Nuevo sistema de subida vinculado a los tipos de sillas.
+- **Auditoría**: Logs detallados sobre la actividad de los usuarios en el sistema.
+- Actualizados `STATUS.md`, `SDD.md` y creado `13-mejoras-ui-ux-wizard.md`.
 
 **Notas para continuar:**
-- Servidor corriendo en http://localhost:3000.
-- Cliente corriendo en http://localhost:5173.
-- Los cambios de modelo (`startedBy`/`startedAt`) ya están aplicados en MongoDB (campos opcionales).
+- Servidor y cliente listos para operar.
+- Documentación al día con el último estado del repositorio (ADR #13).

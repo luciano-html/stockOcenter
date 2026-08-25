@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,16 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { MultiSelectAutocomplete } from '@/components/ui/multi-select-autocomplete'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
-import {
-  Plus, Trash2, AlertTriangle, Upload, X, ArrowLeft, ArrowRight, Check, CheckCircle2, Search,
-} from 'lucide-react'
+import { AlertTriangle, Upload, X, Check, CheckCircle2, Search, Trash2 } from 'lucide-react'
 import { GoBack } from '@/components/shared/GoBack'
-import { qtyWithUnit, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 const schema = z.object({
   name: z.string().min(1, 'Requerido'),
@@ -30,29 +26,23 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 interface BOMEntry { componentId: string; quantity: string }
-
 interface GrupoComponentes { tipo: string; componentes: Componente[] }
 
-const PASOS: { titulo: string; ayuda: string; partes: string[]; unoDe?: boolean }[] = [
+const SECCIONES = [
   {
     titulo: 'Base y rodamiento',
-    ayuda: 'Elegí las piezas que sostienen y mueven la silla',
     partes: ['Rueda', 'Estrella', 'Cilindro', 'Fuelle'],
   },
   {
-    titulo: 'Mecanismo',
-    ayuda: 'Elegí uno: Chapón, Mecanismo o Contacto',
-    partes: ['Chapon', 'Mecanismo', 'Contacto'],
-    unoDe: true,
+    titulo: 'Mecanismo y estructura',
+    partes: ['Chapon', 'Mecanismo', 'Contacto', 'Estructura'],
   },
   {
     titulo: 'Confort',
-    ayuda: 'Relleno, tapizado y zona de apoyo',
-    partes: ['Espuma', 'Tapizado', 'Asiento', 'Respaldo', 'Apoyabrazo', 'Apoyacabezas', 'Respaldos', 'interior'],
+    partes: ['Espuma', 'Tapizado', 'Asiento', 'Respaldo', 'Apoyabrazo', 'Apoyacabezas', 'interior'],
   },
   {
     titulo: 'Herrajes',
-    ayuda: 'Fijación y terminación',
     partes: ['Tornilleria'],
   },
 ]
@@ -68,7 +58,6 @@ const LABEL_PARTE: Record<string, string> = {
   Tapizado: 'Tapizado',
   Asiento: 'Asiento',
   Respaldo: 'Respaldo',
-  Respaldos: 'Respaldo',
   Apoyabrazo: 'Apoyabrazos',
   Apoyacabezas: 'Apoyacabezas',
   interior: 'Interior',
@@ -82,64 +71,53 @@ function ComboCategoria({
   grupo,
   seleccion,
   onSeleccionar,
-  onCantidad,
   onQuitar,
 }: {
   label: string
   grupo: GrupoComponentes
-  seleccion?: { componentId: string; quantity: string }
+  seleccion?: { componentId: string }
   onSeleccionar: (componentId: string) => void
-  onCantidad: (componentId: string, cantidad: number) => void
   onQuitar: (componentId: string) => void
 }) {
   const [term, setTerm] = useState('')
-
   const elegido = seleccion ? grupo.componentes.find((c) => c._id === seleccion.componentId) : undefined
   const opciones = grupo.componentes.filter((c) =>
     `${c.name} ${c.subtipo ?? ''} ${c.marca ?? ''}`.toLowerCase().includes(term.toLowerCase())
   )
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="text-[11px] text-muted-foreground">{grupo.componentes.length} disponibles</span>
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-xs text-muted-foreground">{grupo.componentes.length} disp.</span>
       </div>
 
       {elegido ? (
-        <div className="flex items-center gap-2 rounded-md border border-input bg-muted/30 px-3 py-2">
-          <Check className="h-3.5 w-3.5 shrink-0 text-foreground" />
-          <span className="flex-1 truncate text-sm">{elegido.name}</span>
-          <input
-            type="number"
-            min={1}
-            value={seleccion!.quantity}
-            onChange={(e) => onCantidad(elegido._id, Math.max(1, Number(e.target.value) || 1))}
-            className="w-14 rounded-md border border-input bg-background px-1.5 py-0.5 text-right text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title="Cantidad por silla"
-          />
+        <div className="flex items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 flex-1">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <Check className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate text-sm font-medium" title={elegido.name}>{elegido.name}</span>
+          </div>
           <button
             type="button"
             onClick={() => onQuitar(elegido._id)}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="text-xs font-medium text-destructive hover:underline shrink-0"
           >
-            Cambiar
+            Quitar
           </button>
         </div>
       ) : (
-        <div className="rounded-md border border-input">
+        <div className="rounded-md border border-input flex flex-col flex-1">
           <div className="relative border-b border-input">
-            <Search
-              className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none"
-            />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               value={term}
               onChange={(e) => setTerm(e.target.value)}
-              placeholder={`Filtrar ${label.toLowerCase()}...`}
-              className="w-full rounded-t-md py-2 pl-8 pr-3 text-sm outline-none"
+              placeholder={`Buscar ${label.toLowerCase()}...`}
+              className="w-full py-1.5 pl-8 pr-3 text-sm outline-none bg-transparent"
             />
           </div>
-          <div className="max-h-40 overflow-auto">
+          <div className="max-h-40 overflow-auto bg-background/50 rounded-b-md">
             {opciones.length === 0 && (
               <div className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</div>
             )}
@@ -155,7 +133,7 @@ function ComboCategoria({
               >
                 <span className="truncate">{c.name}</span>
                 {c.subtipo || c.marca ? (
-                  <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">
+                  <span className="ml-2 shrink-0 text-[10px] text-muted-foreground bg-muted/80 px-1.5 py-0.5 rounded">
                     {[c.subtipo, c.marca].filter(Boolean).join(' · ')}
                   </span>
                 ) : null}
@@ -173,13 +151,13 @@ export default function TipoSillaForm() {
   const isEdit = !!id
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  
   const [showConfirm, setShowConfirm] = useState(false)
   const [bom, setBom] = useState<BOMEntry[]>([])
-  const [multiSelected, setMultiSelected] = useState<string[]>([])
   const [bomError, setBomError] = useState('')
+  const [aviso, setAviso] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [paso, setPaso] = useState(0)
 
   const { data: tipoData, isLoading } = useQuery<{ data: ChairTypeWithBOM }>({
     queryKey: ['tipo-silla', id],
@@ -199,13 +177,13 @@ export default function TipoSillaForm() {
       })
       setImageUrl(res.data.data.imageUrl)
     } catch {
-      // error handled by interceptor
+      // error manejado por interceptor
     } finally {
       setUploading(false)
     }
   }
 
-  const { data: compData } = useQuery<{ data: Componente[]; pagination: { total: number } }>({
+  const { data: compData } = useQuery<{ data: Componente[] }>({
     queryKey: ['componentes-select'],
     queryFn: () => api.get('/componentes', { params: { limit: 1000 } }).then((r) => r.data),
   })
@@ -230,31 +208,26 @@ export default function TipoSillaForm() {
 
   const tipoWatch = useWatch<FormData>({ control, name: 'tipo' })
   const nombreWatch = useWatch<FormData>({ control, name: 'name' })
-  const esGiratoria = ['giratoria', 'giratoria integral'].includes((tipoWatch ?? '').trim().toLowerCase())
+
+  const categoria = useMemo(() => {
+    const t = (tipoWatch ?? '').trim().toLowerCase()
+    if (t.startsWith('giratoria')) return 'Giratoria'
+    if (t === 'fija') return 'Fija'
+    return undefined
+  }, [tipoWatch])
 
   const { data: gruposData, isLoading: gruposLoading } = useQuery<{ data: GrupoComponentes[] }>({
-    queryKey: ['componentes-grupos', esGiratoria ? 'Giratoria' : undefined],
+    queryKey: ['componentes-grupos', categoria],
     queryFn: () =>
       api
         .get('/componentes/grupos', {
-          params: esGiratoria ? { tipoSilla: 'Giratoria' } : undefined,
+          params: categoria ? { tipoSilla: categoria } : undefined,
         })
         .then((r) => r.data),
-    enabled: esGiratoria,
+    placeholderData: keepPreviousData,
   })
 
   const grupos = useMemo(() => gruposData?.data ?? [], [gruposData])
-
-  const componentOptions = useMemo(() => {
-    const lista = (compData?.data ?? []).filter((c) => {
-      if (esGiratoria || !tipoWatch) return true
-      return c.tipoSilla === undefined || c.tipoSilla === 'Fija' || c.tipoSilla === 'Ambas'
-    })
-    return lista.map((c) => ({
-      value: c._id,
-      label: `${c.name} (${c.tipo}${c.subtipo ? ` / ${c.subtipo}` : ''}${c.marca ? ` - ${c.marca}` : ''}) — disp. ${qtyWithUnit(c.stockDisponible, c.unit)}`,
-    }))
-  }, [compData, esGiratoria, tipoWatch])
 
   useEffect(() => {
     if (isEdit && tipoData?.data) {
@@ -269,6 +242,23 @@ export default function TipoSillaForm() {
       }
     }
   }, [isEdit, tipoData])
+
+  useEffect(() => {
+    const t = (tipoWatch ?? '').trim().toLowerCase()
+    if (!t || !compData?.data) return
+    const aplica = t.startsWith('giratoria') ? 'Giratoria' : 'Fija'
+    const invalidos = bom.filter((b) => {
+      const comp = compData.data.find((c) => c._id === b.componentId)
+      if (!comp) return false
+      return comp.tipoSilla !== undefined && comp.tipoSilla !== 'Ambas' && comp.tipoSilla !== aplica
+    })
+    if (invalidos.length > 0) {
+      const ids = new Set(invalidos.map((b) => b.componentId))
+      setBom((prev) => prev.filter((b) => !ids.has(b.componentId)))
+      setAviso(`Se quitaron ${invalidos.length} componente(s) que no aplican al tipo ${aplica}`)
+      setTimeout(() => setAviso(''), 6000)
+    }
+  }, [tipoWatch, bom, compData])
 
   const seleccionPorParte = useMemo(() => {
     const map: Record<string, BOMEntry> = {}
@@ -292,19 +282,17 @@ export default function TipoSillaForm() {
         return Math.floor(comp.stockDisponible / Math.max(1, Number(b.quantity) || 1))
       })
       .filter((r): r is number => r !== null)
+    
     if (ratios.length === 0) return null
     return Math.min(...ratios)
   }, [bom, compData])
 
-  const esUltimoPaso = paso === PASOS.length
-  const grupoActual = PASOS[paso]
-  const partesDelPaso = useMemo(
-    () => (grupoActual ? grupoActual.partes.filter((p) => grupos.some((g) => g.tipo === p)) : []),
-    [grupoActual, grupos]
-  )
-  const pasoCompleto = grupoActual?.unoDe
-    ? partesDelPaso.some((p) => !!seleccionPorParte[p])
-    : partesDelPaso.every((p) => !!seleccionPorParte[p])
+  const seccionesActivas = useMemo(() => {
+    return SECCIONES.map((sec) => ({
+      ...sec,
+      partes: sec.partes.filter((p) => grupos.some((g) => g.tipo === p)),
+    })).filter((sec) => sec.partes.length > 0)
+  }, [grupos])
 
   function seleccionarComponente(componentId: string) {
     const parte = grupos.find((g) => g.componentes.some((c) => c._id === componentId))?.tipo
@@ -320,23 +308,6 @@ export default function TipoSillaForm() {
       }
       return [...next, { componentId, quantity: cantidadAnterior }]
     })
-  }
-
-  function addMultiSelectedToBOM() {
-    const existingIds = new Set(bom.map((b) => b.componentId))
-    const newEntries = multiSelected
-      .filter((id) => !existingIds.has(id))
-      .map((id) => ({ componentId: id, quantity: '1' }))
-
-    if (newEntries.length === 0) {
-      setBomError('Los componentes seleccionados ya están en la lista de materiales')
-      setTimeout(() => setBomError(''), 3000)
-      return
-    }
-
-    setBom((prev) => [...prev, ...newEntries])
-    setMultiSelected([])
-    setBomError('')
   }
 
   function updateBOMQuantity(componentId: string, value: string) {
@@ -372,369 +343,229 @@ export default function TipoSillaForm() {
     },
   })
 
-  if (isEdit && isLoading) return <Skeleton className="h-96" />
+  if ((isEdit && isLoading) || (gruposLoading && !gruposData)) {
+    return <div className="space-y-4"><Skeleton className="h-8 w-24" /><Skeleton className="h-[600px] w-full" /></div>
+  }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-10">
       <GoBack to="/tipos-silla" />
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader><CardTitle>{isEdit ? 'Editar tipo de silla' : 'Nuevo tipo de silla'}</CardTitle></CardHeader>
-      <CardContent className="space-y-6">
-        {esGiratoria ? (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
-              <h1 className="truncate text-lg font-bold tracking-tight">
-                {nombreWatch?.trim() || (isEdit ? 'Silla sin nombre' : 'Nueva silla')}
-              </h1>
-              <span className="shrink-0 text-xs text-muted-foreground">{isEdit ? 'Modo edición' : 'Creación'}</span>
-            </div>
+      
+      <div className="flex items-center justify-between pb-2 border-b border-border">
+        <h1 className="text-2xl font-bold tracking-tight">
+          {nombreWatch?.trim() || (isEdit ? 'Silla sin nombre' : 'Crear Silla')}
+        </h1>
+        {isEdit && <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded-md">Modo edición</span>}
+      </div>
 
-            <div className="flex items-center gap-1.5">
-              {PASOS.map((p, i) => (
-                <div key={p.titulo} className="flex flex-1 items-center gap-1.5">
-                  <div
-                    className={cn(
-                      'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium',
-                      i < paso
-                        ? 'bg-green-600 text-white'
-                        : i === paso
-                          ? 'bg-foreground text-background'
-                          : 'bg-muted text-muted-foreground'
-                    )}
-                  >
-                    {i < paso ? <Check className="h-3.5 w-3.5" /> : i + 1}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* COLUMNA IZQUIERDA (Formulario y Catálogo) */}
+        <div className="lg:col-span-8 space-y-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Datos Generales</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nombre de la Silla</Label>
+                    <Input id="name" {...register('name')} placeholder="Ej: Silla Link Base Cromo" />
+                    {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                   </div>
-                  {i < PASOS.length - 1 && <div className="h-0.5 flex-1 bg-muted" />}
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo">Tipo estructural</Label>
+                    <Select id="tipo" {...register('tipo')}>
+                      <option value="">Seleccionar...</option>
+                      <option value="Fija">Fija</option>
+                      <option value="Giratoria">Giratoria</option>
+                      <option value="Giratoria Integral">Giratoria Integral</option>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descripción (opcional)</Label>
+                    <Input id="description" {...register('description')} placeholder="Características clave..." />
+                  </div>
                 </div>
-              ))}
-              <div
-                className={cn(
-                  'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-medium',
-                  esUltimoPaso ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
-                )}
-              >
-                <Check className="h-3.5 w-3.5" />
+                
+                {/* Upload Imagen */}
+                <div className="space-y-2">
+                  <Label>Imagen Representativa</Label>
+                  <div className="flex flex-col items-start gap-3 border rounded-md p-3 bg-muted/20 h-[216px] justify-center">
+                    {imageUrl ? (
+                      <div className="relative w-full h-full rounded border overflow-hidden">
+                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setImageUrl('')}
+                          className="absolute top-2 right-2 bg-background/90 rounded-full p-1 shadow hover:bg-background"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-full flex-1 rounded border-2 border-dashed bg-background flex flex-col items-center justify-center text-muted-foreground">
+                        <Upload className="mb-2 h-6 w-6 opacity-50" />
+                        <span className="text-sm font-medium">Sin imagen</span>
+                        <p className="text-[10px] mt-1">JPG, PNG o WEBP (Máx 5MB)</p>
+                      </div>
+                    )}
+                    {!imageUrl && (
+                      <label className="cursor-pointer w-full text-center bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs font-medium py-2 rounded-md transition-colors">
+                        <span>{uploading ? 'Subiendo...' : 'Seleccionar archivo'}</span>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {aviso && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700">
+              {aviso}
             </div>
+          )}
 
-            {esUltimoPaso ? (
-              <div>
-                <h2 className="text-sm font-semibold">Revisión final</h2>
-                <p className="mb-4 text-xs text-muted-foreground">Confirmá los componentes antes de guardar</p>
+          {tipoWatch ? (
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Catálogo de Componentes (BOM)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {seccionesActivas.map((sec) => (
+                  <div key={sec.titulo} className="space-y-3">
+                    <h3 className="font-semibold text-sm border-b pb-1 text-foreground/80">{sec.titulo}</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {sec.partes.map((parte) => {
+                        const grupo = grupos.find((g) => g.tipo === parte)
+                        if (!grupo) return null
+                        return (
+                          <ComboCategoria
+                            key={parte}
+                            label={LABEL_PARTE[parte] ?? parte}
+                            grupo={grupo}
+                            seleccion={seleccionPorParte[parte]}
+                            onSeleccionar={seleccionarComponente}
+                            onQuitar={removeBOM}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground">
+              Selecciona el <strong>Tipo estructural</strong> arriba para habilitar el catálogo de piezas.
+            </div>
+          )}
+        </div>
 
-                <ul className="divide-y divide-border rounded-md border border-input">
-                  {seleccionados.length === 0 ? (
-                    <li className="px-3 py-6 text-center text-sm text-muted-foreground">Sin componentes seleccionados</li>
-                  ) : (
-                    seleccionados.map((s) => (
-                      <li key={s.componentId} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                        <span className="truncate">{s.comp ? s.comp.name : 'Componente no encontrado'}</span>
-                        <span className="ml-2 shrink-0 text-xs text-muted-foreground">x{s.quantity}</span>
-                      </li>
-                    ))
-                  )}
-                </ul>
+        {/* COLUMNA DERECHA (BOM Sticky) */}
+        <div className="lg:col-span-4 sticky top-6 space-y-4">
+          <Card className="border-primary/20 shadow-sm">
+            <CardHeader className="bg-muted/30 pb-4">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span>Tu Silla</span>
+                <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                  {seleccionados.length} piezas
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              
+              {/* Badge de Sillas Posibles */}
+              {(maxSillas ?? 0) > 0 ? (
+                <div className="p-3 rounded-md bg-green-50 text-green-800 border border-green-200 flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                  <div className="text-sm">
+                    <span className="block font-bold">Sillas Posibles: {maxSillas}</span>
+                    <span className="text-xs opacity-90">Proyección según stock actual</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-md bg-amber-50 text-amber-800 border border-amber-200 flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <div className="text-sm">
+                    <span className="block font-bold">Sillas Posibles: {maxSillas === null ? '—' : '0'}</span>
+                    <span className="text-xs opacity-90">
+                      {maxSillas === null ? 'Agrega piezas para ver proyección' : 'No hay stock de alguna pieza'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
-                <div
-                  className={cn(
-                    'mt-4 flex items-center gap-2 rounded-md p-3 text-sm',
-                    (maxSillas ?? 0) > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                  )}
-                >
-                  {(maxSillas ?? 0) > 0 ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                  )}
-                  <span>
-                    Con el stock actual se pueden armar <strong>{maxSillas ?? 0}</strong> silla(s) de "{nombreWatch || 'sin nombre'}".
+              {orphanCount > 0 && (
+                <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+                  <span className="flex items-center gap-1 font-medium">
+                    <AlertTriangle className="h-3 w-3 shrink-0" /> {orphanCount} pieza(s) huérfana(s)
                   </span>
+                  <Button variant="outline" size="sm" onClick={() => cleanupMutation.mutate()} disabled={cleanupMutation.isPending} className="h-7 text-xs bg-white">
+                    Limpiar lista
+                  </Button>
                 </div>
-              </div>
-            ) : gruposLoading || !gruposData ? (
-              <Skeleton className="h-64" />
-            ) : (
-              <>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold">{grupoActual.titulo}</h2>
-                    {grupoActual.unoDe && (
-                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                        Elegí uno
-                      </span>
-                    )}
-                  </div>
-                  <p className="mb-4 text-xs text-muted-foreground">{grupoActual.ayuda}</p>
-                </div>
+              )}
 
-                {paso === 0 && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nombre</Label>
-                      <Input id="name" {...register('name')} />
-                      {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tipo">Tipo</Label>
-                      <Select id="tipo" {...register('tipo')}>
-                        <option value="">Seleccionar tipo...</option>
-                        <option value="Fija">Fija</option>
-                        <option value="Giratoria">Giratoria</option>
-                        <option value="Giratoria Integral">Giratoria Integral</option>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Descripción</Label>
-                      <Input id="description" {...register('description')} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Imagen</Label>
-                      <div className="flex items-start gap-4">
-                        {imageUrl ? (
-                          <div className="relative w-32 h-32 rounded-md border overflow-hidden shrink-0">
-                            <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                            <button
-                              type="button"
-                              onClick={() => setImageUrl('')}
-                              className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 hover:bg-background"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="w-32 h-32 rounded-md border bg-muted flex items-center justify-center text-muted-foreground text-xs shrink-0">
-                            Sin imagen
-                          </div>
-                        )}
-                        <div className="space-y-2">
-                          <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                            <Upload size={16} />
-                            <span>{uploading ? 'Subiendo...' : 'Subir imagen'}</span>
-                            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageUpload} disabled={uploading} />
-                          </label>
-                          <p className="text-xs text-muted-foreground">JPG, PNG, WEBP o GIF. Máx 5 MB.</p>
+              <div className="max-h-[45vh] overflow-y-auto pr-1 -mr-1 space-y-2">
+                {seleccionados.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No has agregado ninguna pieza aún.</p>
+                ) : (
+                  seleccionados.map((s) => {
+                    const errorCant = !s.quantity || Number(s.quantity) < 1;
+                    return (
+                      <div key={s.componentId} className={cn("flex flex-col gap-1.5 p-2 rounded-md border bg-card text-sm", errorCant && "border-destructive bg-destructive/5")}>
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="font-medium leading-tight text-[13px]">{s.comp ? s.comp.name : 'Desconocido'}</span>
+                          <button onClick={() => removeBOM(s.componentId)} className="text-muted-foreground hover:text-destructive shrink-0 mt-0.5">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Cantidad:</span>
+                          <input
+                            type="number"
+                            min={1}
+                            value={s.quantity}
+                            onChange={(e) => updateBOMQuantity(s.componentId, e.target.value)}
+                            className={cn(
+                              "w-16 rounded border bg-background px-2 py-0.5 text-right text-xs focus:outline-none focus:ring-1",
+                              errorCant ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-primary'
+                            )}
+                          />
                         </div>
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-5">
-                  {grupoActual.partes.map((parte) => {
-                    const grupo = grupos.find((g) => g.tipo === parte)
-                    if (!grupo) return null
-                    return (
-                      <ComboCategoria
-                        key={parte}
-                        label={LABEL_PARTE[parte] ?? parte}
-                        grupo={grupo}
-                        seleccion={seleccionPorParte[parte]}
-                        onSeleccionar={seleccionarComponente}
-                        onCantidad={(componentId, cantidad) => updateBOMQuantity(componentId, String(cantidad))}
-                        onQuitar={removeBOM}
-                      />
                     )
-                  })}
-                </div>
-              </>
-            )}
-
-            {bomError && (
-              <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
-                {bomError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between border-t border-border pt-4">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/tipos-silla')}>Cancelar</Button>
-                <Button variant="outline" size="sm" onClick={() => setPaso((p) => Math.max(0, p - 1))} disabled={paso === 0}>
-                  <ArrowLeft className="h-3.5 w-3.5" /> Atrás
-                </Button>
-              </div>
-              {!esUltimoPaso ? (
-                <Button size="sm" className="bg-primary text-white hover:bg-primary/90" onClick={() => setPaso((p) => p + 1)} disabled={!pasoCompleto}>
-                  Siguiente <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              ) : (
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleSaveRequest} disabled={mutation.isPending}>
-                  {mutation.isPending ? 'Guardando...' : 'Guardar tipo de silla'}
-                </Button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-            <form onSubmit={handleSubmit((form) => mutation.mutate(form))} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre</Label>
-                <Input id="name" {...register('name')} />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tipo">Tipo</Label>
-                <Select id="tipo" {...register('tipo')}>
-                  <option value="">Seleccionar tipo...</option>
-                  <option value="Fija">Fija</option>
-                  <option value="Giratoria">Giratoria</option>
-                  <option value="Giratoria Integral">Giratoria Integral</option>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Input id="description" {...register('description')} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Imagen</Label>
-                <div className="flex items-start gap-4">
-                  {imageUrl ? (
-                    <div className="relative w-32 h-32 rounded-md border overflow-hidden shrink-0">
-                      <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setImageUrl('')}
-                        className="absolute top-1 right-1 bg-background/80 rounded-full p-0.5 hover:bg-background"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-32 h-32 rounded-md border bg-muted flex items-center justify-center text-muted-foreground text-xs shrink-0">
-                      Sin imagen
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <label className="cursor-pointer inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      <Upload size={16} />
-                      <span>{uploading ? 'Subiendo...' : 'Subir imagen'}</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageUpload} disabled={uploading} />
-                    </label>
-                    <p className="text-xs text-muted-foreground">JPG, PNG, WEBP o GIF. Máx 5 MB.</p>
-                  </div>
-                </div>
-              </div>
-            </form>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Lista de materiales</Label>
-                {orphanCount > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => cleanupMutation.mutate()}
-                    disabled={cleanupMutation.isPending}
-                    className="text-amber-600 border-amber-200 hover:bg-amber-50"
-                  >
-                    <AlertTriangle size={14} className="mr-1" />
-                    {cleanupMutation.isPending ? 'Limpiando...' : `Limpiar ${orphanCount} huérfano(s)`}
-                  </Button>
+                  })
                 )}
-              </div>
-
-              <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
-                <div className="flex-1 w-full">
-                  <MultiSelectAutocomplete
-                    options={componentOptions}
-                    selected={multiSelected}
-                    onChange={setMultiSelected}
-                    placeholder="Escribí para filtrar y marcá con checkbox..."
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full lg:w-auto whitespace-nowrap"
-                  disabled={multiSelected.length === 0}
-                  onClick={addMultiSelectedToBOM}
-                >
-                  <Plus size={16} className="mr-1" />
-                  Agregar {multiSelected.length > 0 ? `${multiSelected.length}` : ''}
-                </Button>
               </div>
 
               {bomError && (
-                <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
+                <div className="text-xs text-destructive bg-destructive/10 p-2 rounded border border-destructive/20 font-medium">
                   {bomError}
                 </div>
               )}
 
-              {bom.length > 0 && (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Componente</TableHead>
-                        <TableHead className="w-32">Cantidad</TableHead>
-                        <TableHead className="w-24">Acciones</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bom.map((b, i) => {
-                        const comp = compData?.data.find((c) => c._id === b.componentId)
-                        const isOrphan = !comp
-                        return (
-                          <TableRow key={b.componentId || `orphan-${i}`} className={isOrphan ? 'bg-amber-50' : undefined}>
-                            <TableCell>
-                              {comp ? (
-                                <div>
-                                  <span className="font-medium">{comp.name}</span>
-                                  <p className="text-xs text-muted-foreground">
-                                    Stock: <span className="font-medium text-foreground">{qtyWithUnit(comp.stockActual, comp.unit)}</span> · Disp:{' '}
-                                    <span className="font-medium text-foreground">{qtyWithUnit(comp.stockDisponible, comp.unit)}</span> · Mín:{' '}
-                                    <span className="font-medium text-foreground">{qtyWithUnit(comp.stockMinimo, comp.unit)}</span>
-                                  </p>
-                                </div>
-                              ) : (
-                                <span className="text-amber-700 text-sm">
-                                  Componente no encontrado <span className="font-mono text-xs">({b.componentId})</span>
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="align-top">
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                placeholder="Cantidad"
-                                value={b.quantity}
-                                onChange={(e) => updateBOMQuantity(b.componentId, e.target.value.replace(/\D/g, ''))}
-                              />
-                            </TableCell>
-                            <TableCell className="align-top">
-                              <div className="flex gap-1">
-                                <Button variant="ghost" size="icon" onClick={() => removeBOM(b.componentId)}>
-                                  <Trash2 size={16} className="text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={() => navigate('/tipos-silla')}>Cancelar</Button>
-              <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleSaveRequest} disabled={mutation.isPending}>
-               {mutation.isPending ? 'Guardando...' : 'Guardar'}
+            </CardContent>
+            
+            <div className="p-4 border-t bg-muted/10 rounded-b-lg">
+              <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={handleSaveRequest} disabled={mutation.isPending}>
+                {mutation.isPending ? 'Guardando...' : 'Guardar Tipo de Silla'}
               </Button>
             </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </Card>
+        </div>
+      </div>
 
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogHeader>
           <DialogTitle>{isEdit ? '¿Guardar cambios?' : '¿Crear tipo de silla?'}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground mb-4">
-          {isEdit ? 'Se actualizarán los datos del tipo de silla.' : 'Se creará un nuevo tipo de silla con su BOM.'}
+          {isEdit ? 'Se actualizarán los datos de la silla.' : 'Se guardará la silla con su lista de materiales.'}
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setShowConfirm(false)}>Cancelar</Button>

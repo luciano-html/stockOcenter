@@ -97,7 +97,7 @@ function MetadataDetail({ log }: { log: AuditLog }) {
       rows.push({ label: 'Usuario', value: `${m.username} (${m.role ?? '—'})` })
       break
     case 'login_failed':
-      rows.push({ label: 'Usuario', value: m.username ?? '—' })
+      rows.push({ label: 'Usuario', value: (m.username as string) ?? '—' })
       rows.push({ label: 'Motivo', value: m.reason === 'user_not_found_or_inactive' ? 'No existe o inactivo' : m.reason === 'invalid_password' ? 'Contraseña incorrecta' : (m.reason as string) })
       break
     case 'user_created':
@@ -111,7 +111,7 @@ function MetadataDetail({ log }: { log: AuditLog }) {
       break
     case 'stock_ingreso':
     case 'stock_egreso':
-      rows.push({ label: 'Componente', value: m.componentName ?? '—' })
+      rows.push({ label: 'Componente', value: (m.componentName as string) ?? '—' })
       rows.push({ label: 'Cantidad', value: String(m.quantity ?? '—') })
       if (m.notes) rows.push({ label: 'Notas', value: m.notes as string })
       break
@@ -126,21 +126,21 @@ function MetadataDetail({ log }: { log: AuditLog }) {
     }
     case 'component_created':
     case 'component_deleted':
-      rows.push({ label: 'Componente', value: m.name ?? '—' })
+      rows.push({ label: 'Componente', value: (m.name as string) ?? '—' })
       break
     case 'component_updated':
-      rows.push({ label: 'Componente', value: m.name ?? '—' })
+      rows.push({ label: 'Componente', value: (m.name as string) ?? '—' })
       if (m.changes && typeof m.changes === 'object') {
         rows.push({ label: 'Cambios', value: Object.entries(m.changes as Record<string, unknown>).map(([k, v]) => `${k}: ${formatValue(v)}`).join(' · ') })
       }
       break
     case 'chair_type_created':
     case 'chair_type_deleted':
-      rows.push({ label: 'Tipo de silla', value: m.name ?? '—' })
+      rows.push({ label: 'Tipo de silla', value: (m.name as string) ?? '—' })
       if (m.bomCount !== undefined) rows.push({ label: 'Componentes en BOM', value: String(m.bomCount) })
       break
     case 'chair_type_updated':
-      rows.push({ label: 'Tipo de silla', value: m.name ?? '—' })
+      rows.push({ label: 'Tipo de silla', value: (m.name as string) ?? '—' })
       if (m.bomCount !== undefined) rows.push({ label: 'Componentes en BOM', value: String(m.bomCount) })
       if (m.changes && typeof m.changes === 'object') {
         rows.push({ label: 'Cambios', value: Object.entries(m.changes as Record<string, unknown>).map(([k, v]) => `${k}: ${formatValue(v)}`).join(' · ') })

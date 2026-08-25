@@ -83,10 +83,10 @@ export default function TipoSillaDetail() {
               ) : (tipo.faltantes?.length ?? 0) > 0 ? (
                 <div className="space-y-1">
                   <p className="text-xs text-destructive flex items-center gap-1">
-                    <AlertTriangle size={12} /> Faltan {tipo.faltantes.length} componente(s)
+                    <AlertTriangle size={12} /> Faltan {tipo.faltantes?.length} componente(s)
                   </p>
                   <ul className="text-xs text-destructive/90 space-y-0.5">
-                    {tipo.faltantes.map((f) => (
+                    {tipo.faltantes?.map((f) => (
                       <li key={f.name}>
                         {f.name}: faltan {qtyWithUnit(f.faltante, f.unit)}
                         <span className="text-muted-foreground"> (disp. {qtyWithUnit(f.disponible, f.unit)})</span>
