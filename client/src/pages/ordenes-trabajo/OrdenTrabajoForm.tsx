@@ -6,18 +6,35 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/services/api'
 import { cn, qtyWithUnit } from '@/lib/utils'
-import type { ChairTypeWithBOM, Componente, AxiosErrorType, WorkOrder, User as Usuario } from '@/types'
+import type { ChairTypeWithBOM, Componente, AxiosErrorType, WorkOrder, User as Usuario, Customer } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Autocomplete } from '@/components/ui/autocomplete'
-import { MultiSelectAutocomplete } from '@/components/ui/multi-select-autocomplete'
+import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { GoBack } from '@/components/shared/GoBack'
-import { Plus, Trash2, Package, Wrench, AlertTriangle, Info, CheckCircle, User, ChevronRight } from 'lucide-react'
+import {
+  Trash2,
+  Package,
+  Wrench,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  User,
+  ChevronRight,
+  Search,
+  Building2,
+  Store,
+  Truck,
+  MapPin,
+  Calendar,
+  Clock,
+  CreditCard,
+  FileText,
+} from 'lucide-react'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 
 const itemRowSchema: z.ZodType<
@@ -66,8 +83,46 @@ export default function OrdenTrabajoForm() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedOperator, setSelectedOperator] = useState('')
   const [sillasRows, setSillasRows] = useState<SillaRow[]>([])
-  const [multiSelected, setMultiSelected] = useState<string[]>([])
   const [sillasError, setSillasError] = useState('')
+  const [sillaCommandOpen, setSillaCommandOpen] = useState(false)
+  const [adicCommandOpen, setAdicCommandOpen] = useState(false)
+  const [repCommandOpen, setRepCommandOpen] = useState(false)
+
+  // Customer Management & Search State
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerCommandOpen, setCustomerCommandOpen] = useState(false)
+  const [customerState, setCustomerState] = useState({
+    customerId: '',
+    name: '',
+    razonSocial: '',
+    cuit: '',
+    condicionIva: 'Consumidor Final' as 'Responsable Inscripto' | 'Consumidor Final' | 'Monotributo' | 'Exento',
+    email: '',
+    telefono: '',
+    contacto: '',
+    direccion: '',
+    localidad: 'Santa Fe',
+  })
+
+  // Logistics & Branch Origin State
+  const [logisticaState, setLogisticaState] = useState({
+    sucursalOrigen: 'Santa Fe' as 'Santa Fe' | 'Paraná' | 'Pedido a Fábrica',
+    tipoEntrega: 'Retira' as 'Retira' | 'Reparto / Flete',
+    direccionEntrega: '',
+    localidadEntrega: 'Santa Fe',
+    plantaBaja: false,
+    ascensor: false,
+    escaleraEstrecha: false,
+    plazoEntrega: '',
+    turnoEntrega: 'Indistinto' as 'Mañana' | 'Tarde' | 'Indistinto',
+  })
+
+  // Commercial & Notes State
+  const [comercialState, setComercialState] = useState({
+    formaPago: '',
+    observacionesFactura: '',
+    observacionesReparto: '',
+  })
 
   const {
     control,
@@ -99,6 +154,11 @@ export default function OrdenTrabajoForm() {
     queryFn: () => api.get('/componentes', { params: { limit: 1000 } }).then((r) => r.data.data),
   })
 
+  const { data: customersData } = useQuery<{ data: Customer[] }>({
+    queryKey: ['customers-search', customerSearch],
+    queryFn: () => api.get('/customers', { params: { search: customerSearch, limit: 30 } }).then((r) => r.data),
+  })
+
   const { data: orderData, isLoading: loadingOrder } = useQuery<{ data: WorkOrder }>({
     queryKey: ['orden-trabajo', id],
     queryFn: () => api.get(`/ordenes-trabajo/${id}`).then((r) => r.data),
@@ -112,26 +172,28 @@ export default function OrdenTrabajoForm() {
   }, [compData])
 
   useEffect(() => {
-    if (isEditing && orderData?.data && compData) {
+    if (isEditing && orderData?.data) {
       const ot = orderData.data
       const items = ot.items ?? []
       const adicionales = items
         .filter((i) => i.type === 'adicional')
         .map((i) => {
-          const comp = componentMap.get(i.componentId as unknown as string)
+          const compId = typeof i.componentId === 'object' && i.componentId !== null ? (i.componentId as any)._id : i.componentId
+          const compName = (typeof i.componentId === 'object' && i.componentId !== null ? (i.componentId as any).name : undefined) || componentMap.get(compId)?.name || ''
           return {
-            componentId: i.componentId as unknown as string,
-            componentName: comp?.name ?? '',
+            componentId: compId,
+            componentName: compName,
             quantity: i.quantity,
           }
         })
       const repuestos = items
         .filter((i) => i.type === 'repuesto')
         .map((i) => {
-          const comp = componentMap.get(i.componentId as unknown as string)
+          const compId = typeof i.componentId === 'object' && i.componentId !== null ? (i.componentId as any)._id : i.componentId
+          const compName = (typeof i.componentId === 'object' && i.componentId !== null ? (i.componentId as any).name : undefined) || componentMap.get(compId)?.name || ''
           return {
-            componentId: i.componentId as unknown as string,
-            componentName: comp?.name ?? '',
+            componentId: compId,
+            componentName: compName,
             quantity: i.quantity,
           }
         })
@@ -139,11 +201,15 @@ export default function OrdenTrabajoForm() {
       const sillas = ot.sillas && ot.sillas.length > 0
         ? ot.sillas.map((s) => ({
             id: generateId(),
-            chairTypeId: s.chairTypeId._id,
+            chairTypeId: typeof s.chairTypeId === 'object' && s.chairTypeId !== null ? (s.chairTypeId as any)._id : s.chairTypeId,
             quantity: String(s.quantity),
           }))
         : ot.chairTypeId
-          ? [{ id: generateId(), chairTypeId: ot.chairTypeId._id, quantity: String(ot.quantity ?? 1) }]
+          ? [{
+              id: generateId(),
+              chairTypeId: typeof ot.chairTypeId === 'object' && ot.chairTypeId !== null ? (ot.chairTypeId as any)._id : ot.chairTypeId,
+              quantity: String(ot.quantity ?? 1),
+            }]
           : []
 
       setSillasRows(sillas)
@@ -152,19 +218,73 @@ export default function OrdenTrabajoForm() {
         adicionales,
         repuestos,
       })
+
+      const custObj = typeof ot.customerId === 'object' && ot.customerId !== null ? (ot.customerId as any) : null
+      const clientObj = (ot.cliente || {}) as any
+
+      const custId = custObj?._id || clientObj?.customerId || (typeof ot.customerId === 'string' ? ot.customerId : '')
+      const name = clientObj?.name || custObj?.name || ''
+      const razonSocial = clientObj?.razonSocial || custObj?.razonSocial || name
+      const cuit = clientObj?.cuit || custObj?.cuit || ''
+      const condicionIva = (clientObj?.condicionIva || custObj?.condicionIva || 'Consumidor Final') as any
+      const email = clientObj?.email || custObj?.email || ''
+      const telefono = clientObj?.telefono || custObj?.telefono || ''
+      const contacto = clientObj?.contacto || custObj?.contacto || name
+      const direccion = clientObj?.domicilio || custObj?.direccion || ot.logistica?.direccionEntrega || ''
+      const localidad = custObj?.localidad || ot.logistica?.localidadEntrega || 'Santa Fe'
+
+      if (name || custId) {
+        setCustomerState({
+          customerId: custId || '',
+          name: name || '',
+          razonSocial: razonSocial || '',
+          cuit: cuit || '',
+          condicionIva: condicionIva || 'Consumidor Final',
+          email: email || '',
+          telefono: telefono || '',
+          contacto: contacto || '',
+          direccion: direccion || '',
+          localidad: localidad || 'Santa Fe',
+        })
+      }
+
+      if (ot.logistica) {
+        setLogisticaState({
+          sucursalOrigen: ot.logistica.sucursalOrigen || 'Santa Fe',
+          tipoEntrega: ot.logistica.tipoEntrega || 'Retira',
+          direccionEntrega: ot.logistica.direccionEntrega || direccion || '',
+          localidadEntrega: ot.logistica.localidadEntrega || localidad || 'Santa Fe',
+          plantaBaja: Boolean(ot.logistica.pisoAcceso?.plantaBaja),
+          ascensor: Boolean(ot.logistica.pisoAcceso?.ascensor),
+          escaleraEstrecha: Boolean(ot.logistica.pisoAcceso?.escaleraEstrecha),
+          plazoEntrega: ot.logistica.plazoEntrega || '',
+          turnoEntrega: ot.logistica.turnoEntrega || 'Indistinto',
+        })
+      }
+
+      if (ot.condicionesComerciales) {
+        setComercialState({
+          formaPago: ot.condicionesComerciales.formaPago || '',
+          observacionesFactura: ot.condicionesComerciales.observacionesFactura || '',
+          observacionesReparto: ot.condicionesComerciales.observacionesReparto || '',
+        })
+      }
     }
-  }, [isEditing, orderData, compData, componentMap, reset])
+  }, [isEditing, orderData, componentMap, reset])
+
 
   const {
     fields: adicFields,
     append: appendAdic,
     remove: removeAdic,
+    update: updateAdic,
   } = useFieldArray({ control, name: 'adicionales' })
 
   const {
     fields: repFields,
     append: appendRep,
     remove: removeRep,
+    update: updateRep,
   } = useFieldArray({ control, name: 'repuestos' })
 
   const componentOptions = useMemo(
@@ -248,21 +368,15 @@ export default function OrdenTrabajoForm() {
   const faltantes = requerimientos.filter((r) => r.necesario > r.componente.stockDisponible)
   const hayStockSuficiente = faltantes.length === 0
 
-  function addMultiSelectedToSillas() {
-    const existingIds = new Set(sillasRows.map((s) => s.chairTypeId))
-    const newRows = multiSelected
-      .filter((id) => !existingIds.has(id))
-      .map((id) => ({ id: generateId(), chairTypeId: id, quantity: '1' }))
-
-    if (newRows.length === 0) {
-      setSillasError('Los tipos de silla seleccionados ya están en la orden')
-      setTimeout(() => setSillasError(''), 3000)
-      return
+  function addSilla(id: string) {
+    const existingIndex = sillasRows.findIndex((s) => s.chairTypeId === id)
+    if (existingIndex !== -1) {
+      setSillasRows(prev => prev.filter((_, i) => i !== existingIndex))
+      setSillasError('')
+    } else {
+      setSillasRows((prev) => [...prev, { id: generateId(), chairTypeId: id, quantity: '1' }])
+      setSillasError('')
     }
-
-    setSillasRows((prev) => [...prev, ...newRows])
-    setMultiSelected([])
-    setSillasError('')
   }
 
   function updateSillaQuantity(sillaId: string, value: string) {
@@ -281,6 +395,37 @@ export default function OrdenTrabajoForm() {
     [sillasRows, chairMap]
   )
 
+  const handleSelectCustomer = (c: Customer) => {
+    setCustomerState({
+      customerId: c._id,
+      name: c.name,
+      razonSocial: c.razonSocial || c.name,
+      cuit: c.cuit || '',
+      condicionIva: c.condicionIva || 'Consumidor Final',
+      email: c.email || '',
+      telefono: c.telefono || '',
+      contacto: c.contacto || '',
+      direccion: c.direccion || '',
+      localidad: c.localidad || 'Santa Fe',
+    })
+    setCustomerCommandOpen(false)
+  }
+
+  const handleClearCustomer = () => {
+    setCustomerState({
+      customerId: '',
+      name: '',
+      razonSocial: '',
+      cuit: '',
+      condicionIva: 'Consumidor Final',
+      email: '',
+      telefono: '',
+      contacto: '',
+      direccion: '',
+      localidad: 'Santa Fe',
+    })
+  }
+
   const buildPayload = (form: FormData) => ({
     sillas:
       form.tipoOrden === 'silla'
@@ -290,6 +435,36 @@ export default function OrdenTrabajoForm() {
       ...form.adicionales.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'adicional' as const })),
       ...form.repuestos.map((i) => ({ componentId: i.componentId, quantity: i.quantity, type: 'repuesto' as const })),
     ],
+    customerId: customerState.customerId || undefined,
+    cliente: customerState.name ? {
+      customerId: customerState.customerId || undefined,
+      name: customerState.name,
+      razonSocial: customerState.razonSocial,
+      cuit: customerState.cuit,
+      condicionIva: customerState.condicionIva,
+      email: customerState.email,
+      telefono: customerState.telefono,
+      contacto: customerState.contacto,
+      domicilio: customerState.direccion,
+    } : undefined,
+    logistica: {
+      sucursalOrigen: logisticaState.sucursalOrigen,
+      tipoEntrega: logisticaState.tipoEntrega,
+      direccionEntrega: logisticaState.direccionEntrega || customerState.direccion,
+      localidadEntrega: logisticaState.localidadEntrega || customerState.localidad,
+      pisoAcceso: {
+        plantaBaja: logisticaState.plantaBaja,
+        ascensor: logisticaState.ascensor,
+        escaleraEstrecha: logisticaState.escaleraEstrecha,
+      },
+      plazoEntrega: logisticaState.plazoEntrega,
+      turnoEntrega: logisticaState.turnoEntrega,
+    },
+    condicionesComerciales: {
+      formaPago: comercialState.formaPago,
+      observacionesFactura: comercialState.observacionesFactura,
+      observacionesReparto: comercialState.observacionesReparto,
+    },
   })
 
   const mutation = useMutation({
@@ -349,10 +524,11 @@ export default function OrdenTrabajoForm() {
   }
 
   const stepLabels: Record<1 | 2 | 3, string> = {
-    1: 'Selección',
-    2: 'Confirmación',
-    3: 'Asignar operario',
+    1: 'Cliente, Logística y Artículos',
+    2: 'Confirmación y Disponibilidad',
+    3: 'Asignar Operario',
   }
+
 
   const totalSteps = isEditing ? 2 : 3
   const steps = [1, 2, 3].slice(0, totalSteps).map((n) => ({
@@ -369,9 +545,9 @@ export default function OrdenTrabajoForm() {
   return (
     <div className="space-y-4">
       <GoBack to="/ordenes-trabajo" />
-      <Card className="max-w-2xl mx-auto">
+      <Card className="max-w-4xl mx-auto shadow-sm">
         <CardHeader>
-          <CardTitle>{isEditing ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'}</CardTitle>
+          <CardTitle className="text-xl font-bold">{isEditing ? 'Editar orden de trabajo' : 'Nueva orden de trabajo'}</CardTitle>
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {steps.map((s, idx) => (
               <Fragment key={s.n}>
@@ -399,34 +575,283 @@ export default function OrdenTrabajoForm() {
           <form onSubmit={step === 1 ? goToStep2 : (e) => e.preventDefault()} className="space-y-6">
             {step === 1 && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="tipoOrden">Tipo de orden</Label>
-              <Select id="tipoOrden" value={tipoOrden} onChange={(e) => { setValue('tipoOrden', e.target.value as 'silla' | 'repuestos'); setSillasRows([]); setValue('adicionales', []) }}>
-                <option value="silla">Silla + adicionales</option>
-                <option value="repuestos">Solo repuestos</option>
-              </Select>
-            </div>
+                {/* 1. SECCIÓN: DATOS DEL CLIENTE Y FACTURACIÓN */}
+                <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-900/80 p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-bold text-foreground">Datos del Cliente y Facturación</h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 gap-1 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 shadow-sm"
+                        onClick={() => setCustomerCommandOpen(true)}
+                      >
+                        <Search className="h-3 w-3" />
+                        {customerState.customerId ? 'Cambiar Cliente' : 'Buscar Cliente <F1>'}
+                      </Button>
+                      {customerState.customerId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-7 text-destructive"
+                          onClick={handleClearCustomer}
+                        >
+                          Limpiar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Nombre / Razón Social *</Label>
+                      <Input
+                        placeholder="Ej. Cooperativa / Nombre Cliente"
+                        value={customerState.name}
+                        onChange={(e) => setCustomerState({ ...customerState, name: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">CUIT / DNI</Label>
+                      <Input
+                        placeholder="Ej. 30-52076510-3"
+                        value={customerState.cuit}
+                        onChange={(e) => setCustomerState({ ...customerState, cuit: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Condición de IVA</Label>
+                      <Select
+                        value={customerState.condicionIva}
+                        onChange={(e) => setCustomerState({ ...customerState, condicionIva: e.target.value as any })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      >
+                        <option value="Responsable Inscripto">Responsable Inscripto</option>
+                        <option value="Consumidor Final">Consumidor Final</option>
+                        <option value="Monotributo">Monotributo</option>
+                        <option value="Exento">Exento</option>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Teléfono / Celular</Label>
+                      <Input
+                        placeholder="Ej. 3404-418770"
+                        value={customerState.telefono}
+                        onChange={(e) => setCustomerState({ ...customerState, telefono: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Contacto / Encargado</Label>
+                      <Input
+                        placeholder="Ej. Juan Pérez"
+                        value={customerState.contacto}
+                        onChange={(e) => setCustomerState({ ...customerState, contacto: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Email de Facturación</Label>
+                      <Input
+                        placeholder="cliente@ejemplo.com"
+                        type="email"
+                        value={customerState.email}
+                        onChange={(e) => setCustomerState({ ...customerState, email: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. SECCIÓN: LOGÍSTICA, SUCURSALES Y CONDICIONES DE ENTREGA */}
+                <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-900/80 p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
+                    <Truck className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-bold text-foreground">Logística y Entrega</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                        <Store className="h-3 w-3 text-primary" /> Sucursal Origen
+                      </Label>
+                      <Select
+                        value={logisticaState.sucursalOrigen}
+                        onChange={(e) => setLogisticaState({ ...logisticaState, sucursalOrigen: e.target.value as any })}
+                        className="h-8 text-xs mt-1 font-semibold bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      >
+                        <option value="Santa Fe">📍 Santa Fe</option>
+                        <option value="Paraná">📍 Paraná</option>
+                        <option value="Pedido a Fábrica">🏭 Pedido a Fábrica</option>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Modalidad de Entrega</Label>
+                      <Select
+                        value={logisticaState.tipoEntrega}
+                        onChange={(e) => setLogisticaState({ ...logisticaState, tipoEntrega: e.target.value as any })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      >
+                        <option value="Retira">Retira en Sucursal</option>
+                        <option value="Reparto / Flete">Reparto / Flete a Domicilio</option>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-muted-foreground" /> Plazo de Entrega
+                      </Label>
+                      <Input
+                        type="date"
+                        value={logisticaState.plazoEntrega}
+                        onChange={(e) => setLogisticaState({ ...logisticaState, plazoEntrega: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" /> Turno de Entrega
+                      </Label>
+                      <Select
+                        value={logisticaState.turnoEntrega}
+                        onChange={(e) => setLogisticaState({ ...logisticaState, turnoEntrega: e.target.value as any })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      >
+                        <option value="Indistinto">Indistinto</option>
+                        <option value="Mañana">Mañana (8:00 a 12:30)</option>
+                        <option value="Tarde">Tarde (13:30 a 18:00)</option>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {logisticaState.tipoEntrega === 'Reparto / Flete' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-slate-200 dark:border-slate-800">
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-muted-foreground" /> Domicilio de Entrega
+                        </Label>
+                        <Input
+                          placeholder="Calle, número, piso/depto"
+                          value={logisticaState.direccionEntrega || customerState.direccion}
+                          onChange={(e) => setLogisticaState({ ...logisticaState, direccionEntrega: e.target.value })}
+                          className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Accesibilidad del Edificio / Lugar</Label>
+                        <div className="flex items-center gap-4 mt-2">
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium">
+                            <input
+                              type="checkbox"
+                              checked={logisticaState.plantaBaja}
+                              onChange={(e) => setLogisticaState({ ...logisticaState, plantaBaja: e.target.checked })}
+                              className="rounded border-slate-400 text-primary"
+                            />
+                            Planta Baja
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium">
+                            <input
+                              type="checkbox"
+                              checked={logisticaState.ascensor}
+                              onChange={(e) => setLogisticaState({ ...logisticaState, ascensor: e.target.checked })}
+                              className="rounded border-slate-400 text-primary"
+                            />
+                            Ascensor
+                          </label>
+                          <label className="flex items-center gap-1.5 text-xs cursor-pointer font-medium">
+                            <input
+                              type="checkbox"
+                              checked={logisticaState.escaleraEstrecha}
+                              onChange={(e) => setLogisticaState({ ...logisticaState, escaleraEstrecha: e.target.checked })}
+                              className="rounded border-slate-400 text-destructive"
+                            />
+                            Escalera Estrecha
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. SECCIÓN: CONDICIONES COMERCIALES Y OBSERVACIONES */}
+                <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-900/80 p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-bold text-foreground">Condiciones Comerciales y Observaciones</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Forma de Pago</Label>
+                      <Input
+                        placeholder="Ej. Efectivo / Transf 50% anticipo"
+                        value={comercialState.formaPago}
+                        onChange={(e) => setComercialState({ ...comercialState, formaPago: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                        maxLength={70}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                        <FileText className="h-3 w-3 text-muted-foreground" /> Observaciones Factura
+                      </Label>
+                      <Input
+                        placeholder="Notas para facturación..."
+                        value={comercialState.observacionesFactura}
+                        onChange={(e) => setComercialState({ ...comercialState, observacionesFactura: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1">
+                        <Truck className="h-3 w-3 text-muted-foreground" /> Observaciones Reparto / Taller
+                      </Label>
+                      <Input
+                        placeholder="Instrucciones para taller o chofer..."
+                        value={comercialState.observacionesReparto}
+                        onChange={(e) => setComercialState({ ...comercialState, observacionesReparto: e.target.value })}
+                        className="h-8 text-xs mt-1 bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. SECCIÓN: ARTÍCULOS Y REPUESTOS */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between border-b pb-2">
+
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-bold text-foreground">Artículos de la Orden</h3>
+                    </div>
+                    <div className="w-48">
+                      <Select id="tipoOrden" value={tipoOrden} onChange={(e) => { setValue('tipoOrden', e.target.value as 'silla' | 'repuestos'); setSillasRows([]); setValue('adicionales', []) }}>
+                        <option value="silla">Silla + adicionales</option>
+                        <option value="repuestos">Solo repuestos</option>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
 
             {tipoOrden === 'silla' && (
               <div className="space-y-3">
-                <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-end">
-                  <div className="flex-1 w-full">
-                    <MultiSelectAutocomplete
-                      options={tipoSillaOptions}
-                      selected={multiSelected}
-                      onChange={setMultiSelected}
-                      placeholder="Escribí para filtrar y marcá con checkbox..."
-                    />
-                  </div>
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full lg:w-auto whitespace-nowrap"
-                    disabled={multiSelected.length === 0}
-                    onClick={addMultiSelectedToSillas}
+                    onClick={() => setSillaCommandOpen(true)}
                   >
-                    <Plus size={16} className="mr-1" />
-                    Agregar {multiSelected.length > 0 ? `${multiSelected.length}` : ''}
+                    <Search className="h-4 w-4 mr-2" />
+                    Buscar tipos de silla...
                   </Button>
                 </div>
 
@@ -490,34 +915,32 @@ export default function OrdenTrabajoForm() {
 
             {tipoOrden === 'silla' && (
               <div className="border-t pt-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Package size={16} className="text-muted-foreground" />
-                  <Label className="text-sm font-medium">Adicionales a la silla</Label>
-                  <span className="text-xs text-muted-foreground">(opcional)</span>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Package size={16} className="text-muted-foreground" />
+                    <Label className="text-sm font-medium">Adicionales a la silla</Label>
+                    <span className="text-xs text-muted-foreground">(opcional)</span>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setAdicCommandOpen(true)}>
+                    <Search className="h-4 w-4 mr-2" /> Buscar adicional...
+                  </Button>
                 </div>
-                <ItemRowEditor
-                  options={componentOptions}
-                  onAdd={(componentId, componentName, qty) => {
-                    appendAdic({ componentId, componentName, quantity: qty })
-                  }}
-                />
-                <ItemsTable fields={adicFields} onRemove={removeAdic} />
+                <ItemsTable fields={adicFields} onRemove={removeAdic} onUpdateQuantity={(idx, qty) => updateAdic(idx, { ...adicFields[idx], quantity: qty })} />
               </div>
             )}
 
             <div className="border-t pt-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Wrench size={16} className="text-muted-foreground" />
-                <Label className="text-sm font-medium">Repuestos</Label>
-                <span className="text-xs text-muted-foreground">{tipoOrden === 'silla' ? '(opcional)' : '(obligatorio)'}</span>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Wrench size={16} className="text-muted-foreground" />
+                  <Label className="text-sm font-medium">Repuestos</Label>
+                  <span className="text-xs text-muted-foreground">{tipoOrden === 'silla' ? '(opcional)' : '(obligatorio)'}</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setRepCommandOpen(true)}>
+                  <Search className="h-4 w-4 mr-2" /> Buscar repuesto...
+                </Button>
               </div>
-              <ItemRowEditor
-                options={componentOptions}
-                onAdd={(componentId, componentName, qty) => {
-                  appendRep({ componentId, componentName, quantity: qty })
-                }}
-              />
-              <ItemsTable fields={repFields} onRemove={removeRep} />
+              <ItemsTable fields={repFields} onRemove={removeRep} onUpdateQuantity={(idx, qty) => updateRep(idx, { ...repFields[idx], quantity: qty })} />
               {errors.repuestos && <p className="text-xs text-destructive">{errors.repuestos.message}</p>}
             </div>
 
@@ -693,56 +1116,104 @@ export default function OrdenTrabajoForm() {
             )}
           </form>
         </CardContent>
+        <CommandDialog open={sillaCommandOpen} onOpenChange={setSillaCommandOpen}>
+          <CommandInput placeholder="Buscar tipo de silla..." />
+          <CommandList>
+            <CommandEmpty>No se encontraron sillas.</CommandEmpty>
+            <CommandGroup heading="Tipos de Silla">
+              {tipoSillaOptions.map((t) => (
+                <CommandItem key={t.value} value={t.label} onSelect={() => addSilla(t.value)}>
+                  {t.label}
+                  {sillasRows.some(s => s.chairTypeId === t.value) && (
+                    <CheckCircle className="ml-auto h-4 w-4 text-primary" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
+
+        <CommandDialog open={adicCommandOpen} onOpenChange={setAdicCommandOpen}>
+          <CommandInput placeholder="Buscar adicional..." />
+          <CommandList>
+            <CommandEmpty>No se encontraron componentes.</CommandEmpty>
+            <CommandGroup heading="Componentes">
+              {componentOptions.map((c) => (
+                <CommandItem key={c.value} value={c.label} onSelect={() => {
+                  const existingIndex = adicFields.findIndex(f => f.componentId === c.value)
+                  if (existingIndex !== -1) {
+                    removeAdic(existingIndex)
+                  } else {
+                    appendAdic({ componentId: c.value, componentName: c.label.split(' — ')[0], quantity: 1 })
+                  }
+                }}>
+                  {c.label}
+                  {adicFields.some(f => f.componentId === c.value) && (
+                    <CheckCircle className="ml-auto h-4 w-4 text-primary" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
+
+        {/* BUSCADOR DE CLIENTES MODAL */}
+        <CommandDialog open={customerCommandOpen} onOpenChange={setCustomerCommandOpen}>
+          <CommandInput placeholder="Buscar cliente por nombre, CUIT, teléfono..." value={customerSearch} onValueChange={setCustomerSearch} />
+          <CommandList>
+            <CommandEmpty>No se encontraron clientes registrados.</CommandEmpty>
+            <CommandGroup heading="Clientes">
+              {(customersData?.data ?? []).map((c) => (
+                <CommandItem key={c._id} value={`${c.name} ${c.cuit || ''} ${c.telefono || ''}`} onSelect={() => handleSelectCustomer(c)}>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-foreground">{c.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {c.cuit ? `CUIT: ${c.cuit} · ` : ''}{c.condicionIva} {c.telefono ? `· Tel: ${c.telefono}` : ''}
+                    </span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
+
+        <CommandDialog open={repCommandOpen} onOpenChange={setRepCommandOpen}>
+          <CommandInput placeholder="Buscar repuesto..." />
+          <CommandList>
+            <CommandEmpty>No se encontraron componentes.</CommandEmpty>
+            <CommandGroup heading="Componentes">
+              {componentOptions.map((c) => (
+                <CommandItem key={c.value} value={c.label} onSelect={() => {
+                  const existingIndex = repFields.findIndex(f => f.componentId === c.value)
+                  if (existingIndex !== -1) {
+                    removeRep(existingIndex)
+                  } else {
+                    appendRep({ componentId: c.value, componentName: c.label.split(' — ')[0], quantity: 1 })
+                  }
+                }}>
+                  {c.label}
+                  {repFields.some(f => f.componentId === c.value) && (
+                    <CheckCircle className="ml-auto h-4 w-4 text-primary" />
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
       </Card>
     </div>
-  )
-}
 
-function ItemRowEditor({
-  options,
-  onAdd,
-}: {
-  options: { value: string; label: string }[]
-  onAdd: (componentId: string, componentName: string, quantity: number) => void
-}) {
-  const [componentId, setComponentId] = useState('')
-  const [cantidad, setCantidad] = useState('')
-
-  function handleAdd() {
-    const comp = options.find((o) => o.value === componentId)
-    if (!comp || !cantidad || Number(cantidad) < 1) return
-    onAdd(comp.value, comp.label.split(' — ')[0], Number(cantidad))
-    setComponentId('')
-    setCantidad('1')
-  }
-
-  return (
-    <div className="flex gap-2 items-end">
-      <div className="flex-1">
-        <Autocomplete
-          options={options}
-          value={componentId}
-          onChange={setComponentId}
-          placeholder="Buscar componente..."
-        />
-      </div>
-      <div className="w-24">
-        <Input type="text" inputMode="numeric" placeholder="Cantidad" value={cantidad}
-          onChange={(e) => setCantidad(e.target.value.replace(/\D/g, ''))} />
-      </div>
-      <Button variant="outline" size="icon" onClick={handleAdd} disabled={!componentId || !cantidad || Number(cantidad) < 1}>
-        <Plus size={16} />
-      </Button>
-    </div>
   )
 }
 
 function ItemsTable({
   fields,
   onRemove,
+  onUpdateQuantity,
 }: {
   fields: { id: string; componentId: string; componentName: string; quantity: number }[]
   onRemove: (index: number) => void
+  onUpdateQuantity?: (index: number, quantity: number) => void
 }) {
   if (fields.length === 0) return null
   return (
@@ -759,7 +1230,13 @@ function ItemsTable({
           {fields.map((item, idx) => (
             <TableRow key={item.id}>
               <TableCell className="font-medium">{item.componentName}</TableCell>
-              <TableCell>{item.quantity}</TableCell>
+              <TableCell>
+                {onUpdateQuantity ? (
+                  <Input type="number" min={1} value={item.quantity || ''} onChange={(e) => onUpdateQuantity(idx, Number(e.target.value) || 1)} className="w-24 h-8" />
+                ) : (
+                  item.quantity
+                )}
+              </TableCell>
               <TableCell>
                 <Button variant="ghost" size="icon" onClick={() => onRemove(idx)}>
                   <Trash2 size={16} className="text-destructive" />

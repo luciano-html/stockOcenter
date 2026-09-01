@@ -26,12 +26,42 @@ function validateEnv() {
   }
 }
 
+import { Server as SocketIOServer } from 'socket.io';
+
 async function main() {
   validateEnv();
   await connectDB();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  });
+
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  const io = new SocketIOServer(server, {
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          callback(null, origin);
+        } else {
+          callback(new Error('No permitido por CORS'), false);
+        }
+      },
+      methods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+      credentials: true
+    }
+  });
+
+  app.set('io', io);
+
+  io.on('connection', (socket) => {
+    console.log(`Socket conectado: ${socket.id}`);
+    socket.on('disconnect', () => {
+      console.log(`Socket desconectado: ${socket.id}`);
+    });
   });
 
   server.on('error', (err: NodeJS.ErrnoException) => {

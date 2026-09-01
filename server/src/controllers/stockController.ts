@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Component, StockMovement } from '../models';
+import { Component, StockTransaction } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { sillasPosiblesPorTipo } from '../services/stockService';
 import { clearStockCache, getCache, setCache } from '../utils/cache';
@@ -17,11 +17,9 @@ export async function ingreso(req: Request, res: Response) {
   );
   if (!componente) throw ApiError.notFound('Componente no encontrado');
 
-  await StockMovement.create({
-    componentId: componenteId,
+  await StockTransaction.create({
     type: 'ingreso',
-    quantity: cantidad,
-    notes: notas,
+    items: [{ componentId: componenteId, quantity: cantidad, notes: notas }],
     userId,
     userRole,
   });
@@ -82,16 +80,17 @@ export async function ingresoMasivo(req: Request, res: Response) {
   const userId = req.user?.userId;
   const userRole = req.user?.role;
 
-  await StockMovement.insertMany(
-    items.map((item, index) => ({
+  await StockTransaction.create({
+    type: 'ingreso_masivo',
+    notes: notasGenerales,
+    items: items.map((item, index) => ({
       componentId: item.componenteId,
-      type: 'ingreso',
       quantity: item.cantidad,
       notes: movementNotes[index],
-      userId,
-      userRole,
-    }))
-  );
+    })),
+    userId,
+    userRole,
+  });
 
   await createAuditLog({
     action: 'stock_ingreso_masivo',
@@ -125,11 +124,9 @@ export async function egreso(req: Request, res: Response) {
     throw ApiError.badRequest('Stock insuficiente para realizar el egreso');
   }
 
-  await StockMovement.create({
-    componentId: componenteId,
+  await StockTransaction.create({
     type: 'egreso',
-    quantity: cantidad,
-    notes: notas,
+    items: [{ componentId: componenteId, quantity: cantidad, notes: notas }],
     userId,
     userRole,
   });

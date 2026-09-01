@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { StockMovement } from '../models';
+import { StockTransaction } from '../models';
 import { getPagination, getSkip } from '../utils/pagination';
 
 export async function list(req: Request, res: Response) {
@@ -10,7 +10,7 @@ export async function list(req: Request, res: Response) {
   const filter: Record<string, unknown> = {};
 
   if (componenteId) {
-    filter.componentId = componenteId;
+    filter['items.componentId'] = componenteId;
   }
 
   if (tipo) filter.type = tipo;
@@ -21,13 +21,14 @@ export async function list(req: Request, res: Response) {
     filter.createdAt = dateFilter;
   }
 
-  const total = await StockMovement.countDocuments(filter);
-  const movimientos = await StockMovement.find(filter)
-    .populate('componentId', 'name unit tipo subtipo marca')
+  const total = await StockTransaction.countDocuments(filter);
+  const movimientos = await StockTransaction.find(filter)
+    .populate('items.componentId', 'name unit tipo subtipo marca')
     .populate('userId', 'name role')
     .populate({
       path: 'referenceId',
-      select: 'sillas chairTypeId quantity',
+      model: 'WorkOrder',
+      select: 'sillas chairTypeId quantity items',
       populate: [
         { path: 'sillas.chairTypeId', select: 'name' },
         { path: 'chairTypeId', select: 'name' },

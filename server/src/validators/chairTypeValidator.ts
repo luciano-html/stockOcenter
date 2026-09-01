@@ -11,6 +11,7 @@ export const createChairTypeSchema = z.object({
   tipo: z.string().trim().optional(),
   description: z.string().trim().optional(),
   imageUrl: z.string().trim().optional(),
+  precioVenta: z.number().min(0).optional(),
   bom: z.array(bomItemSchema).default([]),
 });
 
@@ -19,6 +20,7 @@ export const updateChairTypeSchema = z.object({
   tipo: z.string().trim().optional(),
   description: z.string().trim().optional(),
   imageUrl: z.string().trim().optional(),
+  precioVenta: z.number().min(0).optional(),
   active: z.boolean().optional(),
   bom: z.array(bomItemSchema).optional(),
 });

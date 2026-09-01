@@ -1,4 +1,3 @@
-import { useNavigate, useParams } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -13,7 +12,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { GoBack } from '@/components/shared/GoBack'
+
 
 const schema: z.ZodType<FormData, any, any> = z.object({
   name: z.string().min(1, 'Requerido'),
@@ -23,6 +22,7 @@ const schema: z.ZodType<FormData, any, any> = z.object({
   marca: z.string().optional(),
   unit: z.string().min(1, 'Requerido'),
   stockMinimo: z.coerce.number().min(0, 'No puede ser negativo'),
+  precio: z.coerce.number().min(0, 'No puede ser negativo').default(0),
   tipoSilla: z.enum(['Giratoria', 'Fija', 'Ambas']),
 })
 
@@ -34,19 +34,18 @@ type FormData = {
   marca?: string
   unit: string
   stockMinimo: number
+  precio: number
   tipoSilla: 'Giratoria' | 'Fija' | 'Ambas'
 }
 
-export default function ComponenteForm() {
-  const { id } = useParams()
-  const isEdit = !!id
-  const navigate = useNavigate()
+export default function ComponenteForm({ componentId, onSuccess, onCancel }: { componentId?: string; onSuccess?: () => void; onCancel?: () => void }) {
+  const isEdit = !!componentId
   const queryClient = useQueryClient()
   const [showConfirm, setShowConfirm] = useState(false)
 
   const { data, isLoading } = useQuery<{ data: Componente }>({
-    queryKey: ['componente', id],
-    queryFn: () => api.get(`/componentes/${id}`).then((r) => r.data),
+    queryKey: ['componente', componentId],
+    queryFn: () => api.get(`/componentes/${componentId}`).then((r) => r.data),
     enabled: isEdit,
   })
 
@@ -65,28 +64,31 @@ export default function ComponenteForm() {
       marca: data.data.marca,
       unit: data.data.unit,
       stockMinimo: data.data.stockMinimo,
+      precio: data.data.precio ?? 0,
       tipoSilla: data.data.tipoSilla ?? 'Ambas',
-    } : undefined,
+    } : { precio: 0 } as any,
   })
 
   const mutation = useMutation({
     mutationFn: (form: FormData) =>
-      isEdit ? api.put(`/componentes/${id}`, form) : api.post('/componentes', form),
+      isEdit ? api.put(`/componentes/${componentId}`, form) : api.post('/componentes', form),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['componentes'] })
+      queryClient.invalidateQueries({ queryKey: ['componente', componentId] })
       queryClient.invalidateQueries({ queryKey: ['componentes-filtros'] })
-      navigate('/componentes')
+      queryClient.invalidateQueries({ queryKey: ['tipo-silla-bom'] })
+      queryClient.invalidateQueries({ queryKey: ['tipos-silla'] })
+      if (onSuccess) onSuccess()
     },
   })
 
   if (isEdit && isLoading) return <Skeleton className="h-64" />
 
   return (
-    <div className="space-y-4">
-      <GoBack to="/componentes" />
-    <Card className="max-w-lg mx-auto">
-      <CardHeader><CardTitle>{isEdit ? 'Editar componente' : 'Nuevo componente'}</CardTitle></CardHeader>
-      <CardContent>
+    <div className="space-y-4 h-full flex flex-col">
+    <Card className="flex-1 overflow-auto border-0 shadow-none sm:mx-0">
+      <CardHeader className="px-0 pt-0"><CardTitle>{isEdit ? 'Editar componente' : 'Nuevo componente'}</CardTitle></CardHeader>
+      <CardContent className="px-0 pb-0">
         <form onSubmit={handleSubmit((form) => mutation.mutate(form))} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name">Nombre</Label>
@@ -131,7 +133,6 @@ export default function ComponenteForm() {
             <div className="space-y-2">
               <Label htmlFor="stockMinimo">Stock mínimo</Label>
               <Input id="stockMinimo" type="number" {...register('stockMinimo')} />
-              <p className="text-xs text-muted-foreground">Se marcará como stock bajo cuando el disponible sea menor o igual a este valor.</p>
               {errors.stockMinimo && <p className="text-xs text-destructive">{errors.stockMinimo.message}</p>}
             </div>
           </div>
@@ -145,8 +146,8 @@ export default function ComponenteForm() {
             <p className="text-xs text-muted-foreground">Determina en qué tipo de silla (Fija o Giratoria) aparece este componente al armar la lista de materiales.</p>
             {errors.tipoSilla && <p className="text-xs text-destructive">{errors.tipoSilla.message}</p>}
           </div>
-          <div className="flex gap-2 justify-end pt-2">
-            <Button type="button" variant="outline" onClick={() => navigate('/componentes')}>Cancelar</Button>
+          <div className="flex gap-2 justify-end pt-6">
+            <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
             <Button type="button" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setShowConfirm(true)} disabled={mutation.isPending}>{mutation.isPending ? 'Guardando...' : 'Guardar'}</Button>
           </div>
         </form>

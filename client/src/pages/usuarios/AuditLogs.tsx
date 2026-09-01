@@ -67,6 +67,7 @@ const severityClass: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
   en_progreso: 'En progreso',
+  control: 'En control',
   pausada: 'Pausada',
   finalizada: 'Finalizada',
   cancelada: 'Cancelada',
@@ -308,7 +309,14 @@ export default function AuditLogs() {
               const isExpanded = expandedIds.has(log._id)
               return (
                 <>
-                  <TableRow key={log._id} className="cursor-pointer" onClick={() => toggleExpand(log._id)}>
+                  <TableRow 
+                    key={log._id} 
+                    className={cn(
+                      "cursor-pointer transition-colors hover:bg-slate-100",
+                      isExpanded && "bg-slate-200 hover:bg-slate-200 border-l-4 border-l-primary"
+                    )} 
+                    onClick={() => toggleExpand(log._id)}
+                  >
                     <TableCell>
                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </TableCell>
@@ -333,13 +341,15 @@ export default function AuditLogs() {
                     </TableCell>
                   </TableRow>
                   {isExpanded && (
-                    <TableRow className="bg-muted/30">
-                      <TableCell colSpan={6} className="py-3">
-                        <div className="text-sm space-y-2">
-                          <MetadataDetail log={log} />
-                          <div className="border-t pt-2 text-muted-foreground text-xs space-y-1">
-                            <p>IP: {log.ip ?? '—'}</p>
-                            <p>User Agent: {log.userAgent ?? '—'}</p>
+                    <TableRow className="bg-slate-100 hover:bg-slate-100 shadow-inner">
+                      <TableCell colSpan={6} className="p-0 border-b-0">
+                        <div className="p-4 bg-slate-100/50">
+                          <div className="rounded-md border bg-card p-4 shadow-sm text-sm space-y-2">
+                            <MetadataDetail log={log} />
+                            <div className="border-t pt-2 mt-2 text-muted-foreground text-xs space-y-1">
+                              <p>IP: {log.ip ?? '—'}</p>
+                              <p>User Agent: {log.userAgent ?? '—'}</p>
+                            </div>
                           </div>
                         </div>
                       </TableCell>

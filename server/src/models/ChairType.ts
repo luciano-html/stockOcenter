@@ -5,6 +5,8 @@ export interface IChairType extends Document {
   tipo?: string;
   description?: string;
   imageUrl?: string;
+  precioVenta?: number;
+  manoDeObra?: number;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -16,6 +18,8 @@ const chairTypeSchema = new Schema<IChairType>(
     tipo: { type: String, trim: true },
     description: { type: String, trim: true },
     imageUrl: { type: String, trim: true },
+    precioVenta: { type: Number, default: 0 },
+    manoDeObra: { type: Number, default: 25000 },
     active: { type: Boolean, required: true, default: true },
   },
   { timestamps: true }

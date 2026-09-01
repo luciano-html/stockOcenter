@@ -7,9 +7,10 @@ interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  className?: string
 }
 
-function Dialog({ open, onOpenChange, children }: DialogProps) {
+function Dialog({ open, onOpenChange, children, className }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -63,7 +64,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         ref={overlayRef}
-        className="fixed inset-0 bg-black/50"
+        className="fixed inset-0 bg-black/50 backdrop-blur-xs"
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
@@ -73,7 +74,10 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative z-50 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg mx-4 outline-none"
+        className={cn(
+          "relative z-50 w-full max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-card p-6 shadow-2xl mx-4 outline-none",
+          className
+        )}
       >
         <DialogTitleContext.Provider value={titleId}>
           {children}

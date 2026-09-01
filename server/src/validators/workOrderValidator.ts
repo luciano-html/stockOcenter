@@ -12,13 +12,51 @@ const workOrderSillaSchema = z.object({
   quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1'),
 });
 
+const clienteSchema = z.object({
+  customerId: objectIdSchema.optional(),
+  name: z.string().optional(),
+  razonSocial: z.string().optional(),
+  cuit: z.string().optional(),
+  condicionIva: z.string().optional(),
+  email: z.string().optional(),
+  telefono: z.string().optional(),
+  contacto: z.string().optional(),
+  domicilio: z.string().optional(),
+}).passthrough().optional();
+
+const logisticaSchema = z.object({
+  sucursalOrigen: z.enum(['Santa Fe', 'Paraná', 'Pedido a Fábrica']).optional(),
+  tipoEntrega: z.enum(['Retira', 'Reparto / Flete']).optional(),
+  direccionEntrega: z.string().optional(),
+  localidadEntrega: z.string().optional(),
+  pisoAcceso: z.object({
+    plantaBaja: z.boolean().optional(),
+    ascensor: z.boolean().optional(),
+    escaleraEstrecha: z.boolean().optional(),
+  }).optional(),
+  plazoEntrega: z.string().optional(),
+  turnoEntrega: z.enum(['Mañana', 'Tarde', 'Indistinto']).optional(),
+}).passthrough().optional();
+
+const comercialSchema = z.object({
+  formaPago: z.string().optional(),
+  observacionesFactura: z.string().optional(),
+  observacionesReparto: z.string().optional(),
+}).passthrough().optional();
+
 const baseWorkOrderSchema = z.object({
   sillas: z.array(workOrderSillaSchema).optional(),
   chairTypeId: objectIdSchema.optional(),
   quantity: z.coerce.number().int().min(1, 'La cantidad debe ser al menos 1').optional(),
   items: z.array(workOrderItemSchema).optional(),
   assignedTo: objectIdSchema.nullable().optional(),
-}).refine((data) => {
+  customerId: objectIdSchema.nullable().optional(),
+  cliente: clienteSchema,
+  logistica: logisticaSchema,
+  condicionesComerciales: comercialSchema,
+  totales: z.any().optional(),
+  operatorNotes: z.string().optional(),
+}).passthrough().refine((data) => {
   const tieneSillas = (data.sillas && data.sillas.length > 0) || !!data.chairTypeId;
   if (!tieneSillas && (!data.items || data.items.length === 0)) {
     return false;
@@ -40,7 +78,7 @@ export const finalizeWorkOrderSchema = z.object({
 });
 
 export const updateStatusSchema = z.object({
-  status: z.enum(['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada']),
+  status: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada']),
   notas: z.string().optional(),
 });
 
@@ -49,7 +87,7 @@ export const assignWorkOrderSchema = z.object({
 });
 
 export const listWorkOrdersQuerySchema = z.object({
-  estado: z.enum(['pendiente', 'en_progreso', 'pausada', 'finalizada', 'cancelada']).optional(),
+  estado: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

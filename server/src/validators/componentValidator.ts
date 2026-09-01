@@ -11,6 +11,7 @@ export const createComponentSchema = z.object({
   marca: z.string().trim().optional(),
   unit: z.string().min(1, 'La unidad es requerida').trim(),
   stockMinimo: z.number().min(0, 'El stock mínimo no puede ser negativo').default(0),
+  precio: z.number().min(0, 'El precio no puede ser negativo').default(0),
   tipoSilla: tipoSillaSchema.optional(),
 });
 
@@ -23,6 +24,7 @@ export const updateComponentSchema = z.object({
   unit: z.string().min(1, 'La unidad es requerida').trim().optional(),
   stockActual: z.number().min(0, 'El stock actual no puede ser negativo').optional(),
   stockMinimo: z.number().min(0, 'El stock mínimo no puede ser negativo').optional(),
+  precio: z.number().min(0, 'El precio no puede ser negativo').optional(),
   tipoSilla: tipoSillaSchema.optional(),
 });
 

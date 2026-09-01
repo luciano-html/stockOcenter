@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 const Login = lazy(() => import('@/pages/Login'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const ComponentesList = lazy(() => import('@/pages/componentes/ComponentesList'))
-const ComponenteForm = lazy(() => import('@/pages/componentes/ComponenteForm'))
+
 const TiposSillaList = lazy(() => import('@/pages/tipos-silla/TiposSillaList'))
 const TipoSillaForm = lazy(() => import('@/pages/tipos-silla/TipoSillaForm'))
 const TipoSillaDetail = lazy(() => import('@/pages/tipos-silla/TipoSillaDetail'))
@@ -18,6 +18,7 @@ const IngresoStock = lazy(() => import('@/pages/IngresoStock'))
 const StockReadOnly = lazy(() => import('@/pages/StockReadOnly'))
 const UsuariosList = lazy(() => import('@/pages/usuarios/UsuariosList'))
 const PerfilForm = lazy(() => import('@/pages/perfil/PerfilForm'))
+const RankingSillas = lazy(() => import('@/pages/ranking/RankingSillas'))
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Skeleton className="h-96" />}>{children}</Suspense>
@@ -36,8 +37,7 @@ const router = createBrowserRouter([
       { path: 'ingreso-stock', element: <AdminRoute><SuspenseWrapper><IngresoStock /></SuspenseWrapper></AdminRoute> },
       { path: 'stock', element: <SuspenseWrapper><StockReadOnly /></SuspenseWrapper> },
       { path: 'componentes', element: <SuspenseWrapper><ComponentesList /></SuspenseWrapper> },
-      { path: 'componentes/nuevo', element: <AdminRoute><SuspenseWrapper><ComponenteForm /></SuspenseWrapper></AdminRoute> },
-      { path: 'componentes/:id', element: <AdminRoute><SuspenseWrapper><ComponenteForm /></SuspenseWrapper></AdminRoute> },
+
       { path: 'tipos-silla', element: <SuspenseWrapper><TiposSillaList /></SuspenseWrapper> },
       { path: 'tipos-silla/nuevo', element: <AdminRoute><SuspenseWrapper><TipoSillaForm /></SuspenseWrapper></AdminRoute> },
       { path: 'tipos-silla/:id', element: <SuspenseWrapper><TipoSillaDetail /></SuspenseWrapper> },
@@ -48,6 +48,7 @@ const router = createBrowserRouter([
       { path: 'ordenes-trabajo/:id/editar', element: <AdminRoute><SuspenseWrapper><OrdenTrabajoForm /></SuspenseWrapper></AdminRoute> },
       { path: 'usuarios', element: <AdminRoute><SuspenseWrapper><UsuariosList /></SuspenseWrapper></AdminRoute> },
       { path: 'perfil', element: <SuspenseWrapper><PerfilForm /></SuspenseWrapper> },
+      { path: 'ranking', element: <SuspenseWrapper><RankingSillas /></SuspenseWrapper> },
     ],
   },
 ])

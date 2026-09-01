@@ -1,12 +1,13 @@
-import { Component, BOMItem, StockMovement, ChairType, WorkOrder } from '../models';
+import { Component, BOMItem, StockTransaction, ChairType, WorkOrder } from '../models';
 import { ApiError } from '../utils/ApiError';
 import type { IWorkOrderItem } from '../models/WorkOrder';
 import { clearStockCache } from '../utils/cache';
 
 const TRANSITIONS: Record<string, string[]> = {
   pendiente: ['en_progreso', 'cancelada'],
-  en_progreso: ['pausada', 'finalizada', 'cancelada'],
+  en_progreso: ['pausada', 'control', 'finalizada', 'cancelada'],
   pausada: ['en_progreso', 'cancelada'],
+  control: ['en_progreso', 'finalizada', 'cancelada'],
   finalizada: [],
   cancelada: [],
 };
@@ -155,9 +156,9 @@ export async function descontarStock(
   const label = sillasLabel ?? `Repuestos x${totalRepuestos}`;
 
   if (compList.length === 0) {
-    await StockMovement.create({
-      type: 'egreso',
-      quantity: totalRepuestos,
+    await StockTransaction.create({
+      type: 'consumo_orden',
+      items: [],
       referenceType: 'work-order',
       referenceId: workOrderId,
       notes: `${label} (OT #${workOrderId.slice(-6)})`,
@@ -165,18 +166,18 @@ export async function descontarStock(
       userRole,
     });
   } else {
-    await StockMovement.insertMany(
-      compList.map((item) => ({
-        type: 'egreso' as const,
+    await StockTransaction.create({
+      type: 'consumo_orden',
+      items: compList.map((item) => ({
         componentId: item.componentId,
         quantity: item.quantity,
-        referenceType: 'work-order' as const,
-        referenceId: workOrderId,
-        notes: `${label} — ${item.quantity} unidades (OT #${workOrderId.slice(-6)})`,
-        userId,
-        userRole,
-      }))
-    );
+      })),
+      referenceType: 'work-order',
+      referenceId: workOrderId,
+      notes: `${label} (OT #${workOrderId.slice(-6)})`,
+      userId,
+      userRole,
+    });
   }
 
   clearStockCache();
@@ -195,7 +196,7 @@ export async function liberarReserva(sillas: SillaReq[], items?: IWorkOrderItem[
 }
 
 export async function recalcularReservas() {
-  const ordenes = await WorkOrder.find({ status: { $in: ['en_progreso', 'pausada'] } }).lean();
+  const ordenes = await WorkOrder.find({ status: { $in: ['en_progreso', 'pausada', 'control'] } }).lean();
   const componentes = await Component.find().lean();
   const reservas: Record<string, number> = {};
 

@@ -18,6 +18,8 @@ router.use(authenticate);
 
 router.get('/', validate(listWorkOrdersQuerySchema, 'query'), workOrderController.list);
 router.get('/counts', workOrderController.counts);
+router.get('/stats/ranking', workOrderController.getRankingSillas);
+router.get('/stats/ventas', workOrderController.getVentasStats);
 router.get('/:id', validate(workOrderParamsSchema, 'params'), workOrderController.getById);
 router.get('/:id/detalle', validate(workOrderParamsSchema, 'params'), workOrderController.getDetalle);
 router.post('/', authorize('admin'), validate(createWorkOrderSchema), workOrderController.create);
@@ -37,7 +39,7 @@ router.post(
 );
 router.patch(
   '/:id/estado',
-  authorize('admin'),
+  authorize('admin', 'operario'),
   validate(workOrderParamsSchema, 'params'),
   validate(updateStatusSchema),
   workOrderController.updateStatus

@@ -1,10 +1,24 @@
 import { Types } from 'mongoose';
-import { BOMItem, Component, ChairType } from '../models';
+import { BOMItem, Component, ChairType, WorkOrder } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { getCache, setCache, clearStockCache } from '../utils/cache';
 
 const SILLAS_CACHE_KEY = 'sillas:posibles-por-tipo';
 const SILLAS_CACHE_TTL = 60; // segundos
+
+async function getPendingChairQuantities(): Promise<Map<string, number>> {
+  const pendingOrders = await WorkOrder.aggregate([
+    { $match: { status: 'pendiente' } },
+    { $unwind: '$sillas' },
+    {
+      $group: {
+        _id: '$sillas.chairTypeId',
+        pendingQuantity: { $sum: '$sillas.quantity' }
+      }
+    }
+  ]);
+  return new Map(pendingOrders.map(p => [p._id.toString(), p.pendingQuantity]));
+}
 
 export async function calcularSillasPosibles(chairTypeId: string) {
   const [result] = await BOMItem.aggregate([
@@ -33,7 +47,11 @@ export async function calcularSillasPosibles(chairTypeId: string) {
     { $group: { _id: null, minPosibles: { $min: '$posibles' } } },
   ]);
 
-  return result?.minPosibles ?? 0;
+  const rawPosibles = result?.minPosibles ?? 0;
+  const pendingMap = await getPendingChairQuantities();
+  const pending = pendingMap.get(chairTypeId.toString()) || 0;
+  
+  return Math.max(0, rawPosibles - pending);
 }
 
 export async function calcularSillasPosiblesConDetalle(chairTypeId: string) {
@@ -95,8 +113,12 @@ export async function calcularSillasPosiblesConDetalle(chairTypeId: string) {
       faltante: Math.max(0, item.quantity - item.disponible),
     }));
 
+  const rawPosibles = minSillas === Infinity ? 0 : minSillas;
+  const pendingMap = await getPendingChairQuantities();
+  const pending = pendingMap.get(chairTypeId.toString()) || 0;
+
   return {
-    sillasPosibles: minSillas === Infinity ? 0 : minSillas,
+    sillasPosibles: Math.max(0, rawPosibles - pending),
     limitante,
     faltantes,
   };
@@ -199,18 +221,25 @@ export async function sillasPosiblesPorTipo() {
     { $sort: { name: 1 } },
   ]);
 
-  const data = resultados.map((r) => ({
-    _id: r._id.toString(),
-    name: r.name,
-    sillasPosibles: r.sillasPosibles ?? 0,
-    limitante: r.limitante
-      ? {
-          name: r.limitante.name,
-          stockDisponible: r.limitante.stockDisponible,
-          necesario: r.limitante.necesario,
-        }
-      : null,
-  }));
+  const pendingMap = await getPendingChairQuantities();
+
+  const data = resultados.map((r) => {
+    const rawPosibles = r.sillasPosibles ?? 0;
+    const pending = pendingMap.get(r._id.toString()) || 0;
+    
+    return {
+      _id: r._id.toString(),
+      name: r.name,
+      sillasPosibles: Math.max(0, rawPosibles - pending),
+      limitante: r.limitante
+        ? {
+            name: r.limitante.name,
+            stockDisponible: r.limitante.stockDisponible,
+            necesario: r.limitante.necesario,
+          }
+        : null,
+    };
+  });
 
   setCache(SILLAS_CACHE_KEY, data, SILLAS_CACHE_TTL);
   return data;

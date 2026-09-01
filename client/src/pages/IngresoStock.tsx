@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
-import type { Componente, StockMovement, Pagination, StockResumen, AxiosErrorType } from '@/types'
+import type { Componente, StockTransaction, Pagination, StockResumen, AxiosErrorType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,9 +61,14 @@ export default function IngresoStock() {
     isLoading: movLoading,
     isError: movError,
     refetch: refetchMovimientos,
-  } = useQuery<{ data: StockMovement[]; pagination: Pagination }>({
+  } = useQuery<{ data: StockTransaction[]; pagination: Pagination }>({
     queryKey: ['movimientos', 'list', movFilters],
-    queryFn: () => api.get('/stock/movimientos', { params: movFilters }).then((r) => r.data),
+    queryFn: () => {
+      const params: Record<string, string | number> = { page: movFilters.page }
+      if (movFilters.componenteId) params.componenteId = movFilters.componenteId
+      if (movFilters.tipo) params.tipo = movFilters.tipo
+      return api.get('/stock/movimientos', { params }).then((r) => r.data)
+    },
     enabled: activeTab === 'historial',
   })
 
@@ -324,11 +329,11 @@ export default function IngresoStock() {
               {bulkItems.length > 0 && (
                 <div className="rounded-md border overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-muted">
+                    <thead className="bg-slate-100/90 dark:bg-slate-900/80 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                        <th className="text-left font-medium px-3 py-2">Componente</th>
-                        <th className="text-left font-medium px-3 py-2 w-32">Cantidad</th>
-                        <th className="text-left font-medium px-3 py-2">Notas</th>
+                        <th className="text-left font-semibold px-3 py-2.5">Componente</th>
+                        <th className="text-left font-semibold px-3 py-2.5 w-32">Cantidad</th>
+                        <th className="text-left font-semibold px-3 py-2.5">Notas</th>
                         <th className="w-10"></th>
                       </tr>
                     </thead>

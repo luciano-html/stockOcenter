@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import api from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Eye, Pencil, Trash2, Search, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, ChevronDown, Image, ArmchairIcon } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { GoBack } from '@/components/shared/GoBack'
 import { qtyWithUnit, cn } from '@/lib/utils'
 
@@ -32,6 +32,7 @@ export default function TiposSillaList() {
 
   const { data, isLoading } = useQuery<{ data: ChairTypeWithBOM[]; pagination: Pagination }>({
     queryKey: ['tipos-silla', search, chairTipoFiltro, marcaFiltro, page, sort, order],
+    placeholderData: keepPreviousData,
     queryFn: () =>
       api
         .get('/tipos-silla', {
@@ -157,9 +158,9 @@ export default function TiposSillaList() {
     const bom = data?.data.items ?? []
 
     return (
-      <TableRow className="bg-muted/30 hover:bg-muted/30">
-        <TableCell colSpan={7} className="p-0">
-          <div className="p-4">
+      <TableRow className="bg-slate-100 hover:bg-slate-100 shadow-inner">
+        <TableCell colSpan={7} className="p-0 border-b-0">
+          <div className="p-4 bg-slate-100/50">
             {isLoading ? (
               <Skeleton className="h-24" />
             ) : bom.length === 0 ? (
@@ -167,12 +168,13 @@ export default function TiposSillaList() {
                 Este tipo de silla no tiene componentes asignados
               </p>
             ) : (
-              <div className="rounded-md border overflow-x-auto">
+              <div className="rounded-md border bg-card shadow-sm overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Componente</TableHead>
                       <TableHead>Cantidad por silla</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Disponible</TableHead>
                       <TableHead className="text-right">Faltante</TableHead>
                       {isAdmin && <TableHead className="w-16">Acciones</TableHead>}
@@ -181,10 +183,13 @@ export default function TiposSillaList() {
                   <TableBody>
                     {bom.map((item) => {
                       const faltante = Math.max(0, item.quantity - item.stockDisponible)
+                      const precio = item.componentId.precio ?? 0
+                      const subtotal = item.quantity * precio
                       return (
                         <TableRow key={item.componentId._id}>
                           <TableCell className="font-medium">{item.componentId.name}</TableCell>
                           <TableCell>{qtyWithUnit(item.quantity, item.componentId.unit)}</TableCell>
+                          <TableCell className="text-right font-medium">${subtotal.toLocaleString()}</TableCell>
                           <TableCell className="text-right text-muted-foreground">
                             {qtyWithUnit(item.stockDisponible, item.componentId.unit)}
                           </TableCell>
@@ -211,6 +216,12 @@ export default function TiposSillaList() {
                     })}
                   </TableBody>
                 </Table>
+                <div className="p-3 border-t bg-muted/20 flex justify-end items-center gap-2">
+                  <span className="text-sm font-semibold">Costo Total de la Silla:</span>
+                  <span className="text-lg font-bold text-primary">
+                    ${bom.reduce((acc, item) => acc + (item.quantity * (item.componentId.precio ?? 0)), 0).toLocaleString()}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -353,12 +364,14 @@ export default function TiposSillaList() {
           </TableHeader>
           <TableBody>
             {data?.data.map((t) => (
-              <>
-                <TableRow
-                  key={t._id}
-                  className="cursor-pointer"
-                  onClick={() => toggleExpand(t._id)}
-                >
+                <React.Fragment key={t._id}>
+                  <TableRow
+                    className={cn(
+                      "cursor-pointer transition-colors hover:bg-slate-100",
+                      expandedIds.has(t._id) && "bg-slate-200 hover:bg-slate-200 border-l-4 border-l-primary"
+                    )}
+                    onClick={() => toggleExpand(t._id)}
+                  >
                   <TableCell className="w-10">
                     <button
                       type="button"
@@ -413,8 +426,8 @@ export default function TiposSillaList() {
                     </div>
                   </TableCell>
                 </TableRow>
-                {expandedIds.has(t._id) && <ExpandedRow key={`${t._id}-bom`} chairTypeId={t._id} />}
-              </>
+                {expandedIds.has(t._id) && <ExpandedRow chairTypeId={t._id} />}
+              </React.Fragment>
             ))}
             {data?.data.length === 0 && (
               <TableRow>

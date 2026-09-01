@@ -11,8 +11,10 @@ import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Pencil, Trash2, Search, Eye, AlertTriangle, Package } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import ComponenteForm from './ComponenteForm'
 import { GoBack } from '@/components/shared/GoBack'
 
 export default function ComponentesList() {
@@ -21,9 +23,22 @@ export default function ComponentesList() {
   const tipoFiltro = params.get('tipo') ?? ''
   const subtipoFiltro = params.get('subtipo') ?? ''
   const stockBajoFiltro = params.get('stockBajo') === 'true'
+  const actionParam = params.get('action')
   const page = Number(params.get('page') ?? '1')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [editId, setEditId] = useState<string | undefined>(undefined)
   const [showReserved, setShowReserved] = useState(false)
+
+  useEffect(() => {
+    if (actionParam === 'new') {
+      setEditId(undefined)
+      setSheetOpen(true)
+      const next = new URLSearchParams(params)
+      next.delete('action')
+      setParams(next, { replace: true })
+    }
+  }, [actionParam, params, setParams])
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const isAdmin = user?.role === 'admin'
@@ -110,15 +125,25 @@ export default function ComponentesList() {
     return 'success'
   }
 
+  function handleOpenCreate() {
+    setEditId(undefined)
+    setSheetOpen(true)
+  }
+
+  function handleOpenEdit(id: string) {
+    setEditId(id)
+    setSheetOpen(true)
+  }
+
   return (
     <div className="space-y-4">
       <GoBack to="/" />
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Componentes</h1>
         {isAdmin && (
-          <Link to="/componentes/nuevo">
-            <Button className="bg-green-600 hover:bg-green-700 text-white"><Plus size={16} className="mr-1" /> Nuevo componente</Button>
-          </Link>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={handleOpenCreate}>
+            <Plus size={16} className="mr-1" /> Nuevo componente
+          </Button>
         )}
       </div>
 
@@ -216,6 +241,7 @@ export default function ComponentesList() {
                 <TableHead className="text-right">Reservado</TableHead>
                 <TableHead className="text-right">Disponible</TableHead>
                 <TableHead className="text-right">Mínimo</TableHead>
+                <TableHead className="text-right">Precio</TableHead>
                 <TableHead>Estado</TableHead>
                 {isAdmin && <TableHead className="w-24 text-right">Acciones</TableHead>}
               </TableRow>
@@ -236,6 +262,7 @@ export default function ComponentesList() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">{c.stockMinimo}</TableCell>
+                    <TableCell className="text-right">${(c.precio ?? 0).toLocaleString()}</TableCell>
                     <TableCell>
                       {isBajo
                         ? <Badge variant="destructive"><AlertTriangle size={12} className="mr-1" /> Stock bajo</Badge>
@@ -245,9 +272,7 @@ export default function ComponentesList() {
                     {isAdmin && (
                       <TableCell>
                         <div className="flex gap-1 justify-end">
-                          <Link to={`/componentes/${c._id}`}>
-                            <Button variant="ghost" size="icon"><Pencil size={16} /></Button>
-                          </Link>
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(c._id)}><Pencil size={16} /></Button>
                           <Button variant="ghost" size="icon" onClick={() => setDeleteId(c._id)}>
                             <Trash2 size={16} className="text-destructive" />
                           </Button>
@@ -318,6 +343,18 @@ export default function ComponentesList() {
           ))}
         </div>
       </Dialog>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] sm:max-w-none overflow-y-auto">
+          {sheetOpen && (
+            <ComponenteForm 
+              componentId={editId} 
+              onSuccess={() => setSheetOpen(false)} 
+              onCancel={() => setSheetOpen(false)} 
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

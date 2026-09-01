@@ -28,7 +28,7 @@ export const egresoStockSchema = z.object({
 
 export const movimientosQuerySchema = z.object({
   componenteId: objectIdSchema.optional(),
-  tipo: z.enum(['ingreso', 'egreso']).optional(),
+  tipo: z.enum(['ingreso', 'egreso', 'ingreso_masivo', 'consumo_orden', 'ajuste']).optional(),
   desde: z.string().optional(),
   hasta: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),

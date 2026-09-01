@@ -1,0 +1,11 @@
+{
+  "name": "stockocenter-store-demo",
+  "version": "1.0.0",
+  "description": "Demo store frontend",
+  "scripts": {
+    "start": "serve -p 5500 -C"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}

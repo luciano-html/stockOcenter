@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/services/api'
-import type { WorkOrder, StockResumen, StockMovement } from '@/types'
+import type { WorkOrder, StockResumen, StockTransaction } from '@/types'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,7 @@ import { getOrdenSillas, getOrdenSillasTotal } from '@/lib/ordenes'
 const statusLabels: Record<string, string> = {
   pendiente: 'Pendiente',
   en_progreso: 'En progreso',
+  control: 'En control',
   pausada: 'Pausada',
   finalizada: 'Finalizada',
   cancelada: 'Cancelada',
@@ -25,6 +26,7 @@ const statusLabels: Record<string, string> = {
 const statusClass: Record<string, string> = {
   pendiente: 'bg-gray-100 text-gray-700 border-gray-300',
   en_progreso: 'bg-blue-100 text-blue-700 border-blue-300',
+  control: 'bg-purple-100 text-purple-700 border-purple-300',
   pausada: 'bg-amber-100 text-amber-700 border-amber-300',
   finalizada: 'bg-green-100 text-green-700 border-green-300',
   cancelada: 'bg-red-100 text-red-700 border-red-300',
@@ -74,7 +76,7 @@ export default function Dashboard() {
     staleTime: 15000,
   })
 
-  const { data: movimientosHoy, isError: movimientosHoyError } = useQuery<{ data: StockMovement[] }>({
+  const { data: movimientosHoy, isError: movimientosHoyError } = useQuery<{ data: StockTransaction[] }>({
     queryKey: ['movimientos-hoy'],
     queryFn: () =>
       api
@@ -84,7 +86,7 @@ export default function Dashboard() {
     staleTime: 15000,
   })
 
-  const { data: movimientosRecientes } = useQuery<{ data: StockMovement[] }>({
+  const { data: movimientosRecientes } = useQuery<{ data: StockTransaction[] }>({
     queryKey: ['movimientos-recent'],
     queryFn: () => api.get('/stock/movimientos', { params: { limit: 10 } }).then((r) => r.data),
     refetchInterval: 30000,
@@ -102,12 +104,12 @@ export default function Dashboard() {
   )
 
   const ordenesActivas = useMemo(
-    () => (ordenesData?.data ?? []).filter((o) => ['pendiente', 'en_progreso', 'pausada'].includes(o.status)).length,
+    () => (ordenesData?.data ?? []).filter((o) => ['pendiente', 'en_progreso', 'control', 'pausada'].includes(o.status)).length,
     [ordenesData]
   )
 
   const ingresosHoyTotal = useMemo(
-    () => (movimientosHoy?.data ?? []).reduce((sum, m) => sum + m.quantity, 0),
+    () => (movimientosHoy?.data ?? []).reduce((sum, m) => sum + m.items.reduce((s, i) => s + i.quantity, 0), 0),
     [movimientosHoy]
   )
 
@@ -115,6 +117,7 @@ export default function Dashboard() {
     const groups: Record<string, WorkOrder[]> = {
       pendiente: [],
       en_progreso: [],
+      control: [],
       pausada: [],
       finalizada: [],
     }
@@ -156,13 +159,16 @@ export default function Dashboard() {
         </div>
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Hola, {user?.name || user?.username} 👋</p>
+        </div>
         {isAdmin && (
           <div className="flex gap-2">
             <Link to="/tipos-silla/nuevo">
               <Button variant="outline" size="sm"><Plus size={16} className="mr-1" /> Silla</Button>
             </Link>
-            <Link to="/componentes/nuevo">
+            <Link to="/componentes?action=new">
               <Button variant="outline" size="sm"><Package size={16} className="mr-1" /> Componente</Button>
             </Link>
             <Link to="/ordenes-trabajo/nuevo">
@@ -216,8 +222,8 @@ export default function Dashboard() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {(['pendiente', 'en_progreso', 'pausada', 'finalizada'] as const).map((status) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {(['pendiente', 'en_progreso', 'control', 'finalizada'] as const).map((status) => (
           <Card key={status} className="flex flex-col max-h-[520px]">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-base">
@@ -241,7 +247,7 @@ export default function Dashboard() {
                     <p className="font-medium text-sm group-hover:text-primary transition-colors">
                       {getOrdenSillas(ot).length === 0
                         ? 'Solo repuestos'
-                        : getOrdenSillas(ot).map((s) => s.chairTypeId.name).join(', ')}
+                        : getOrdenSillas(ot).map((s) => s.chairTypeId?.name || 'Silla Eliminada').join(', ')}
                     </p>
                     {ot.assignedTo && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">

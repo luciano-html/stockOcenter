@@ -166,7 +166,7 @@ export async function getById(req: Request, res: Response) {
   if (!tipo) throw ApiError.notFound('Tipo de silla no encontrado');
 
   const bom = await BOMItem.find({ chairTypeId: tipo._id })
-    .populate('componentId', 'name unit')
+    .populate('componentId', 'name unit precio')
     .lean();
 
   const detalle = await calcularSillasPosiblesConDetalle(tipo._id.toString());
@@ -356,6 +356,7 @@ export async function bomDetalle(req: Request, res: Response) {
           tipo: '$componente.tipo',
           subtipo: '$componente.subtipo',
           marca: '$componente.marca',
+          precio: '$componente.precio',
         },
         quantity: '$quantity',
         stockActual: '$componente.stockActual',

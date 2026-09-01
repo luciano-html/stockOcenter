@@ -17,13 +17,17 @@ import { AlertTriangle, Upload, X, Check, CheckCircle2, Search, Trash2 } from 'l
 import { GoBack } from '@/components/shared/GoBack'
 import { cn } from '@/lib/utils'
 
+
 const schema = z.object({
   name: z.string().min(1, 'Requerido'),
   tipo: z.string().optional(),
   description: z.string().optional(),
+  precioVenta: z.any().transform(v => Number(v) || 0),
+  margen: z.any().transform(v => Number(v) || 0),
 })
 
 type FormData = z.infer<typeof schema>
+
 
 interface BOMEntry { componentId: string; quantity: string }
 interface GrupoComponentes { tipo: string; componentes: Componente[] }
@@ -160,6 +164,7 @@ export default function TipoSillaForm() {
   const [uploading, setUploading] = useState(false)
 
   const { data: tipoData, isLoading } = useQuery<{ data: ChairTypeWithBOM }>({
+
     queryKey: ['tipo-silla', id],
     queryFn: () => api.get(`/tipos-silla/${id}`).then((r) => r.data),
     enabled: isEdit,
@@ -201,13 +206,30 @@ export default function TipoSillaForm() {
     },
   })
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm<FormData>({
+  const { data: pricingData } = useQuery<{ data: { config: { manoDeObra: number } } }>({
+    queryKey: ['pricing-overview'],
+    queryFn: () => api.get('/pricing').then((r) => r.data),
+    staleTime: 60000,
+  })
+  const manoDeObraGlobal = pricingData?.data?.config?.manoDeObra ?? 25000
+
+  const { register, handleSubmit, control, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    values: isEdit && tipoData ? { name: tipoData.data.name, tipo: tipoData.data.tipo ?? '', description: tipoData.data.description ?? '' } : undefined,
+    defaultValues: { name: '', tipo: '', description: '', precioVenta: 0, margen: 0 },
+    values: isEdit && tipoData ? { 
+      name: tipoData.data.name, 
+      tipo: tipoData.data.tipo ?? '', 
+      description: tipoData.data.description ?? '',
+      precioVenta: (tipoData.data as any).precioVenta ?? 0,
+      margen: 0
+    } : undefined,
   })
 
-  const tipoWatch = useWatch<FormData>({ control, name: 'tipo' })
-  const nombreWatch = useWatch<FormData>({ control, name: 'name' })
+  const tipoWatch = useWatch({ control, name: 'tipo' })
+  const nombreWatch = useWatch({ control, name: 'name' })
+  const precioVentaWatch = useWatch({ control, name: 'precioVenta' })
+  const margenWatch = useWatch({ control, name: 'margen' })
+
 
   const categoria = useMemo(() => {
     const t = (tipoWatch ?? '').trim().toLowerCase()
@@ -236,12 +258,32 @@ export default function TipoSillaForm() {
         setBom(
           tipoData.data.bom.map((b) => ({
             componentId: typeof b.componentId === 'string' ? b.componentId : (b.componentId?._id ?? ''),
-            quantity: String(b.quantity),
+            quantity: b.quantity.toString(),
           }))
         )
       }
+      
+      // Calculate initial margin if we have precioVenta and bom loaded
+      if (tipoData.data.bom) {
+        const _bom = tipoData.data.bom;
+        const _compData = compData?.data ?? [];
+        if (_compData.length > 0) {
+           let initCosto = 0;
+           for (const b of _bom) {
+             const cId = typeof b.componentId === 'string' ? b.componentId : (b.componentId?._id ?? '');
+             const comp = _compData.find(c => c._id === cId);
+             if (comp) initCosto += (comp.precio ?? 0) * (Number(b.quantity) || 0);
+           }
+           initCosto += manoDeObraGlobal;
+           const initPrecioVenta = Number((tipoData.data as any).precioVenta) || 0;
+           if (initCosto > 0 && initPrecioVenta > 0) {
+             const calcMargen = Math.round(((initPrecioVenta - initCosto) / initCosto) * 100);
+             setValue('margen', calcMargen);
+           }
+        }
+      }
     }
-  }, [isEdit, tipoData])
+  }, [isEdit, tipoData, compData, manoDeObraGlobal, setValue])
 
   useEffect(() => {
     const t = (tipoWatch ?? '').trim().toLowerCase()
@@ -273,6 +315,19 @@ export default function TipoSillaForm() {
     () => bom.map((b) => ({ ...b, comp: compData?.data.find((c) => c._id === b.componentId) ?? null })),
     [bom, compData]
   )
+
+  const costoEstimado = useMemo(() => {
+    const costoPiezas = seleccionados.reduce((acc, s) => acc + (s.comp?.precio ?? 0) * (Number(s.quantity) || 0), 0)
+    return costoPiezas + manoDeObraGlobal
+  }, [seleccionados, manoDeObraGlobal])
+
+
+  useEffect(() => {
+    if (Number(margenWatch) > 0 && costoEstimado > 0) {
+      const nuevoPrecio = costoEstimado * (1 + Number(margenWatch) / 100)
+      setValue('precioVenta', Math.round(nuevoPrecio), { shouldValidate: true })
+    }
+  }, [costoEstimado, margenWatch, setValue])
 
   const maxSillas = useMemo(() => {
     const ratios = bom
@@ -466,9 +521,9 @@ export default function TipoSillaForm() {
         </div>
 
         {/* COLUMNA DERECHA (BOM Sticky) */}
-        <div className="lg:col-span-4 sticky top-6 space-y-4">
-          <Card className="border-primary/20 shadow-sm">
-            <CardHeader className="bg-muted/30 pb-4">
+        <div className="lg:col-span-4 sticky top-6 space-y-4 self-start">
+          <Card className="border-primary/20 shadow-sm flex flex-col max-h-[calc(100vh-12rem)]">
+            <CardHeader className="bg-muted/30 pb-4 shrink-0">
               <CardTitle className="text-lg flex items-center justify-between">
                 <span>Tu Silla</span>
                 <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
@@ -476,7 +531,8 @@ export default function TipoSillaForm() {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4 space-y-4">
+            
+            <CardContent className="pt-4 space-y-4 flex-1 overflow-y-auto">
               
               {/* Badge de Sillas Posibles */}
               {(maxSillas ?? 0) > 0 ? (
@@ -499,6 +555,20 @@ export default function TipoSillaForm() {
                 </div>
               )}
 
+              {/* Costo Estimado */}
+              <div className="p-3 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                <span className="block font-bold text-base">Costo Estimado: ${costoEstimado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                <span className="text-xs opacity-90">Basado en el precio de los componentes</span>
+              </div>
+
+              {/* Precio Venta y Ganancia */}
+              <div className="p-3 rounded-md bg-purple-50 text-purple-800 border border-purple-200">
+                <span className="block font-bold text-base">Precio de Venta: ${(precioVentaWatch || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                <span className="block text-[13px] font-semibold mt-0.5 text-purple-700">
+                  Ganancia Proyectada: ${((precioVentaWatch || 0) - costoEstimado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
               {orphanCount > 0 && (
                 <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
                   <span className="flex items-center gap-1 font-medium">
@@ -510,7 +580,17 @@ export default function TipoSillaForm() {
                 </div>
               )}
 
-              <div className="max-h-[45vh] overflow-y-auto pr-1 -mr-1 space-y-2">
+              <div className="pr-1 -mr-1 space-y-2">
+                {/* Mano de Obra informativa */}
+                <div className="flex flex-col gap-1 p-2.5 rounded-md border bg-blue-50/50 border-blue-200 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-xs text-blue-900">Mano de Obra (Global):</span>
+                    <span className="font-bold text-xs text-blue-950">${manoDeObraGlobal.toLocaleString('es-AR')}</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Configurada centralmente en Gráficos → Precios y Costos</p>
+                </div>
+
+
                 {seleccionados.length === 0 ? (
                   <p className="text-xs text-muted-foreground py-4 text-center">No has agregado ninguna pieza aún.</p>
                 ) : (
@@ -520,9 +600,11 @@ export default function TipoSillaForm() {
                       <div key={s.componentId} className={cn("flex flex-col gap-1.5 p-2 rounded-md border bg-card text-sm", errorCant && "border-destructive bg-destructive/5")}>
                         <div className="flex justify-between items-start gap-2">
                           <span className="font-medium leading-tight text-[13px]">{s.comp ? s.comp.name : 'Desconocido'}</span>
-                          <button onClick={() => removeBOM(s.componentId)} className="text-muted-foreground hover:text-destructive shrink-0 mt-0.5">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0 mt-0.5">
+                            <button type="button" onClick={() => removeBOM(s.componentId)} className="text-muted-foreground hover:text-destructive transition-colors" title="Quitar componente del BOM">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">Cantidad:</span>
@@ -537,6 +619,10 @@ export default function TipoSillaForm() {
                             )}
                           />
                         </div>
+                        <div className="flex items-center justify-between border-t border-muted/50 pt-1.5 mt-0.5">
+                          <span className="text-[11px] text-muted-foreground">Precio U.: ${(s.comp?.precio ?? 0).toLocaleString('es-AR')}</span>
+                          <span className="text-[11px] font-semibold text-red-600">Subtotal: ${((s.comp?.precio ?? 0) * (Number(s.quantity) || 0)).toLocaleString('es-AR')}</span>
+                        </div>
                       </div>
                     )
                   })
@@ -550,8 +636,8 @@ export default function TipoSillaForm() {
               )}
 
             </CardContent>
-            
-            <div className="p-4 border-t bg-muted/10 rounded-b-lg">
+
+            <div className="p-4 border-t bg-muted/10 rounded-b-lg shrink-0">
               <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold" onClick={handleSaveRequest} disabled={mutation.isPending}>
                 {mutation.isPending ? 'Guardando...' : 'Guardar Tipo de Silla'}
               </Button>
@@ -574,4 +660,4 @@ export default function TipoSillaForm() {
       </Dialog>
     </div>
   )
-}
+}

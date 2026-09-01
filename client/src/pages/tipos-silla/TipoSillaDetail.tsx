@@ -103,6 +103,15 @@ export default function TipoSillaDetail() {
                 <p className="text-xs font-medium text-green-600">{sillasPosibles} silla(s)</p>
               )}
             </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">Costo Estimado</p>
+              <p className="font-bold text-primary">
+                ${(bom.reduce((acc, item) => {
+                  const comp = typeof item.componentId === 'string' ? null : item.componentId;
+                  return acc + (comp?.precio ?? 0) * (item.quantity ?? 0);
+                }, 0)).toLocaleString()}
+              </p>
+            </div>
           </div>
           {tipo.description ? (
             <p className="text-sm text-muted-foreground mt-4 border-t pt-3">{tipo.description}</p>
@@ -126,6 +135,8 @@ export default function TipoSillaDetail() {
                 <TableRow>
                   <TableHead>Componente</TableHead>
                   <TableHead className="text-right">Cantidad por silla</TableHead>
+                  <TableHead className="text-right">Precio U.</TableHead>
+                  <TableHead className="text-right">Subtotal</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -136,6 +147,10 @@ export default function TipoSillaDetail() {
                   const compIdString = typeof item.componentId === 'string'
                     ? item.componentId
                     : (item.componentId?._id ?? '')
+                  
+                  const precioU = comp?.precio ?? 0;
+                  const subtotal = precioU * (item.quantity ?? 0);
+
                   return (
                     <TableRow key={item._id} className={!comp ? 'bg-amber-50' : undefined}>
                       <TableCell className="font-medium">
@@ -153,12 +168,14 @@ export default function TipoSillaDetail() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">{qtyWithUnit(item.quantity, comp?.unit)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">${precioU.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-medium">${subtotal.toLocaleString()}</TableCell>
                     </TableRow>
                   )
                 })}
                 {bom.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                       Este tipo de silla no tiene componentes asignados
                     </TableCell>
                   </TableRow>

@@ -33,16 +33,24 @@ if (Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyCont
     Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -WorkingDirectory "$root\server" -WindowStyle Normal
 }
 
-# ---------- 3. Frontend ----------
-Write-Host "`n[3/4] Frontend (client, puerto 5173)..." -ForegroundColor Yellow
+# ---------- 3. Frontend Admin ----------
+Write-Host "`n[3/5] Frontend Admin (client, puerto 5173)..." -ForegroundColor Yellow
 if (Get-NetTCPConnection -State Listen -LocalPort 5173 -ErrorAction SilentlyContinue) {
     Write-Host "Puerto 5173 ya en uso (client ya corriendo)" -ForegroundColor DarkYellow
 } else {
     Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "npm run dev" -WorkingDirectory "$root\client" -WindowStyle Normal
 }
 
-# ---------- 4. Tunel ngrok ----------
-Write-Host "`n[4/4] Tunel ngrok..." -ForegroundColor Yellow
+# ---------- 4. Tienda Demo (Store) ----------
+Write-Host "`n[4/5] Tienda Demo (store-frontend, puerto 5500)..." -ForegroundColor Yellow
+if (Get-NetTCPConnection -State Listen -LocalPort 5500 -ErrorAction SilentlyContinue) {
+    Write-Host "Puerto 5500 ya en uso (tienda ya corriendo)" -ForegroundColor DarkYellow
+} else {
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "npm start" -WorkingDirectory "$root\store-frontend" -WindowStyle Normal
+}
+
+# ---------- 5. Tunel ngrok ----------
+Write-Host "`n[5/5] Tunel ngrok..." -ForegroundColor Yellow
 $ngrokCmd = (Get-Command ngrok -ErrorAction SilentlyContinue).Source
 if (-not $ngrokCmd) {
     $ngrokCmd = "C:\Users\luchardo\AppData\Local\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe"
@@ -54,6 +62,7 @@ Write-Host "`nEsperando a que levanten los servicios..." -ForegroundColor Yellow
 foreach ($i in 1..24) {
     Start-Sleep -Seconds 5
     if ((Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue) -and
+        (Get-NetTCPConnection -State Listen -LocalPort 5500 -ErrorAction SilentlyContinue) -and
         (Get-NetTCPConnection -State Listen -LocalPort 5173 -ErrorAction SilentlyContinue)) { break }
 }
 

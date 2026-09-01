@@ -90,24 +90,24 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogHeader>
         <DialogTitle>
-          {step === 1 && 'Paso 1 de 3: Verificar cantidades preparadas'}
-          {step === 2 && 'Paso 2 de 3: Confirmar egreso de componentes'}
-          {step === 3 && 'Paso 3 de 3: Confirmar finalización'}
+          {step === 1 && 'Paso 1 de 3: Verificar y controlar componentes'}
+          {step === 2 && 'Paso 2 de 3: Aviso de egreso de inventario'}
+          {step === 3 && 'Paso 3 de 3: Confirmar finalización y checkout'}
         </DialogTitle>
       </DialogHeader>
 
       {step === 1 && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Confirmá que preparaste la cantidad exacta de cada ítem. Si falta algo, no podés finalizar la orden.
+            Confirmá la cantidad preparada de cada componente. Cada ítem confirmado quedará detallado en la orden finalizada y se descontará del inventario.
           </p>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ítem</TableHead>
+                  <TableHead>Ítem / Componente</TableHead>
                   <TableHead>Cantidad requerida</TableHead>
-                  <TableHead>Cantidad preparada</TableHead>
+                  <TableHead>Cantidad a descontar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -124,7 +124,7 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
                           const value = e.target.value.replace(/\D/g, '')
                           setCantidades((prev) => prev.map((c, i) => (i === idx ? (value === '' ? 0 : Number(value)) : c)))
                         }}
-                        className="w-24"
+                        className="w-24 font-semibold text-center"
                       />
                     </TableCell>
                   </TableRow>
@@ -147,15 +147,21 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
 
       {step === 2 && (
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Al finalizar se descontarán los siguientes componentes del stock:
-          </p>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-900 flex items-start gap-2">
+            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Aviso de impacto en Stock</p>
+              <p className="text-xs text-amber-800">
+                Al confirmar, se descontarán definitivamente los siguientes componentes del stock y se registrará la transacción de consumo vinculada a esta orden:
+              </p>
+            </div>
+          </div>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Componente</TableHead>
-                  <TableHead>Cantidad a egresar</TableHead>
+                  <TableHead>Cantidad a descontar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -165,7 +171,9 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
                       <Package size={16} className="text-muted-foreground" />
                       {getItemLabel(item)}
                     </TableCell>
-                    <TableCell>{qtyWithUnit(item.quantity, item.unit || item.componentId.unit)}</TableCell>
+                    <TableCell className="font-semibold text-red-600">
+                      -{qtyWithUnit(cantidades[idx] ?? item.quantity, item.unit || item.componentId.unit)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -183,16 +191,16 @@ export default function FinalizarOrdenModal({ orderId, items, isOpen, onClose }:
           <div className="flex items-start gap-3 bg-muted p-3 rounded-md">
             <CheckCircle size={20} className="text-green-600 shrink-0 mt-0.5" />
             <div className="text-sm space-y-1">
-              <p className="font-medium">Resumen</p>
-              <p className="text-muted-foreground">{items.length} ítem(s) verificados correctamente.</p>
-              <p className="text-muted-foreground">El stock será descontado al confirmar.</p>
+              <p className="font-medium">Resumen del Checkout</p>
+              <p className="text-muted-foreground">{items.length} ítem(s) verificados y listos para ser descontados.</p>
+              <p className="text-muted-foreground">El stock será descontado y quedará detallado en la orden finalizada.</p>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notas">Notas / novedades (opcional)</Label>
+            <Label htmlFor="notas">Notas / observaciones del control (opcional)</Label>
             <Input
               id="notas"
-              placeholder="ej. Se entregó completo, faltó un tornillo..."
+              placeholder="ej. Control de calidad aprobado, armado completo..."
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
             />
