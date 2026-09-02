@@ -8,7 +8,7 @@ export function useDeliveryRoutes() {
     queryKey: ['deliveryRoutes'],
     queryFn: async () => {
       const res = await api.get('/delivery-routes')
-      return res.data
+      return res.data.data
     },
   })
 }

@@ -19,7 +19,7 @@ export function HojasRuta() {
   if (isLoading) return <Skeleton className="h-96 w-full" />
   if (error) return <div className="text-red-500">Error al cargar hojas de ruta.</div>
 
-  const routeList = routes || []
+  const routeList = Array.isArray(routes) ? routes : (routes as any)?.data ? (routes as any).data : []
 
   return (
     <div className="space-y-6">

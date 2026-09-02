@@ -55,7 +55,7 @@ export function ColaReparto() {
   }
 
   if (isLoading) return <Skeleton className="h-96 w-full" />
-  if (error) return <div className="text-red-500">Error al cargar datos.</div>
+  if (error) return <div className="text-red-500">Error al cargar datos: {error instanceof Error ? error.message : JSON.stringify(error)}</div>
 
   return (
     <div className="space-y-6">
