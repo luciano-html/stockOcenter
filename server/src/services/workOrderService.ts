@@ -5,12 +5,15 @@ import { clearStockCache } from '../utils/cache';
 
 const TRANSITIONS: Record<string, string[]> = {
   pendiente: ['en_progreso', 'cancelada'],
-  en_progreso: ['pausada', 'control', 'finalizada', 'cancelada'],
+  en_progreso: ['pausada', 'control', 'espera_reparto', 'cancelada'],
   pausada: ['en_progreso', 'cancelada'],
-  control: ['en_progreso', 'finalizada', 'cancelada'],
+  control: ['en_progreso', 'espera_reparto', 'cancelada'],
+  espera_reparto: ['en_reparto'],
+  en_reparto: ['espera_reparto', 'finalizada'],
   finalizada: [],
   cancelada: [],
 };
+
 
 export function canTransition(from: string, to: string): boolean {
   return TRANSITIONS[from]?.includes(to) ?? false;

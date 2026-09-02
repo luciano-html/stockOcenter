@@ -18,3 +18,6 @@ export type { IPricingConfig } from './PricingConfig';
 export { Customer } from './Customer';
 export type { ICustomer, CondicionIva } from './Customer';
 
+
+export { DeliveryRoute } from './DeliveryRoute';
+export type { IDeliveryRoute } from './DeliveryRoute';

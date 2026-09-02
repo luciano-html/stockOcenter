@@ -15,6 +15,8 @@ const adminLinks = [
   { to: '/componentes', label: 'Componentes', icon: Package },
   { to: '/tipos-silla', label: 'Tipos de silla', icon: ArmchairIcon },
   { to: '/ordenes-trabajo', label: 'Órdenes de trabajo', icon: ClipboardList },
+  { to: '/stock-armado', label: 'Stock Armado', icon: Package },
+  { to: '/reparto', label: 'Reparto', icon: Truck },
 ]
 
 const operarioLinks = [
@@ -22,6 +24,8 @@ const operarioLinks = [
   { to: '/stock', label: 'Stock', icon: Package },
   { to: '/tipos-silla', label: 'Tipos de silla', icon: ArmchairIcon },
   { to: '/ordenes-trabajo', label: 'Órdenes de trabajo', icon: ClipboardList },
+  { to: '/stock-armado', label: 'Stock Armado', icon: Package },
+  { to: '/reparto', label: 'Reparto', icon: Truck },
 ]
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {

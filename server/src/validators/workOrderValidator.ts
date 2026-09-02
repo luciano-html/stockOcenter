@@ -78,7 +78,7 @@ export const finalizeWorkOrderSchema = z.object({
 });
 
 export const updateStatusSchema = z.object({
-  status: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada']),
+  status: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'espera_reparto', 'en_reparto', 'finalizada', 'cancelada']),
   notas: z.string().optional(),
 });
 
@@ -87,7 +87,7 @@ export const assignWorkOrderSchema = z.object({
 });
 
 export const listWorkOrdersQuerySchema = z.object({
-  estado: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada']).optional(),
+  estado: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'espera_reparto', 'en_reparto', 'finalizada', 'cancelada']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

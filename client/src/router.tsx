@@ -19,6 +19,8 @@ const StockReadOnly = lazy(() => import('@/pages/StockReadOnly'))
 const UsuariosList = lazy(() => import('@/pages/usuarios/UsuariosList'))
 const PerfilForm = lazy(() => import('@/pages/perfil/PerfilForm'))
 const RankingSillas = lazy(() => import('@/pages/ranking/RankingSillas'))
+const StockArmadoView = lazy(() => import('@/pages/stock/StockArmadoView'))
+const RepartoView = lazy(() => import('@/pages/reparto/RepartoView'))
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Skeleton className="h-96" />}>{children}</Suspense>
@@ -36,6 +38,7 @@ const router = createBrowserRouter([
       { index: true, element: <SuspenseWrapper><Dashboard /></SuspenseWrapper> },
       { path: 'ingreso-stock', element: <AdminRoute><SuspenseWrapper><IngresoStock /></SuspenseWrapper></AdminRoute> },
       { path: 'stock', element: <SuspenseWrapper><StockReadOnly /></SuspenseWrapper> },
+      { path: 'stock-armado', element: <SuspenseWrapper><StockArmadoView /></SuspenseWrapper> },
       { path: 'componentes', element: <SuspenseWrapper><ComponentesList /></SuspenseWrapper> },
 
       { path: 'tipos-silla', element: <SuspenseWrapper><TiposSillaList /></SuspenseWrapper> },
@@ -46,6 +49,7 @@ const router = createBrowserRouter([
       { path: 'ordenes-trabajo/nuevo', element: <AdminRoute><SuspenseWrapper><OrdenTrabajoForm /></SuspenseWrapper></AdminRoute> },
       { path: 'ordenes-trabajo/:id', element: <SuspenseWrapper><OrdenTrabajoDetail /></SuspenseWrapper> },
       { path: 'ordenes-trabajo/:id/editar', element: <AdminRoute><SuspenseWrapper><OrdenTrabajoForm /></SuspenseWrapper></AdminRoute> },
+      { path: 'reparto', element: <SuspenseWrapper><RepartoView /></SuspenseWrapper> },
       { path: 'usuarios', element: <AdminRoute><SuspenseWrapper><UsuariosList /></SuspenseWrapper></AdminRoute> },
       { path: 'perfil', element: <SuspenseWrapper><PerfilForm /></SuspenseWrapper> },
       { path: 'ranking', element: <SuspenseWrapper><RankingSillas /></SuspenseWrapper> },

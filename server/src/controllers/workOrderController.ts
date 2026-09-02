@@ -53,7 +53,7 @@ function getSillasNames(ot: {
   return [];
 }
 
-const STATUS_KEYS = ['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada'] as const;
+const STATUS_KEYS = ['pendiente', 'en_progreso', 'pausada', 'control', 'espera_reparto', 'en_reparto', 'finalizada', 'cancelada'] as const;
 
 export async function counts(req: Request, res: Response) {
   const match: any = {};
@@ -169,6 +169,15 @@ export async function create(req: Request, res: Response) {
     totales,
     operatorNotes,
   } = req.body;
+  let finalCondiciones = condicionesComerciales;
+  if (finalCondiciones?.formaPago) {
+    const p = finalCondiciones.formaPago.toLowerCase();
+    if (p.includes('tarjeta') || p.includes('transferencia')) {
+      finalCondiciones.observacionesFactura = finalCondiciones.observacionesFactura || `Txn: MOCK_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      finalCondiciones.observacionesReparto = finalCondiciones.observacionesReparto ? `${finalCondiciones.observacionesReparto} | 🚨 Firmar remito o factura` : '🚨 Firmar remito o factura';
+    }
+  }
+
   const sillas = sillasFromBody(req.body);
 
   let finalCliente = cliente;
@@ -235,7 +244,7 @@ export async function create(req: Request, res: Response) {
     customerId: finalCustomerId ?? undefined,
     cliente: finalCliente,
     logistica: logistica ?? undefined,
-    condicionesComerciales: condicionesComerciales ?? undefined,
+    condicionesComerciales: finalCondiciones ?? undefined,
     totales: totales ?? undefined,
     operatorNotes: operatorNotes ?? undefined,
     createdBy: req.user?.userId,
@@ -300,10 +309,19 @@ export async function update(req: Request, res: Response) {
   ot.quantity = quantity ?? undefined;
   ot.items = items ?? [];
   ot.assignedTo = assignedTo ?? undefined;
+  let finalCondiciones = condicionesComerciales;
+  if (finalCondiciones?.formaPago) {
+    const p = finalCondiciones.formaPago.toLowerCase();
+    if (p.includes('tarjeta') || p.includes('transferencia')) {
+      finalCondiciones.observacionesFactura = finalCondiciones.observacionesFactura || `Txn: MOCK_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      finalCondiciones.observacionesReparto = finalCondiciones.observacionesReparto ? (finalCondiciones.observacionesReparto.includes('Firmar') ? finalCondiciones.observacionesReparto : `${finalCondiciones.observacionesReparto} | 🚨 Firmar remito o factura`) : '🚨 Firmar remito o factura';
+    }
+  }
+
   if (customerId !== undefined) ot.customerId = customerId ?? undefined;
   if (cliente !== undefined) ot.cliente = cliente;
   if (logistica !== undefined) ot.logistica = logistica;
-  if (condicionesComerciales !== undefined) ot.condicionesComerciales = condicionesComerciales;
+  if (condicionesComerciales !== undefined) ot.condicionesComerciales = finalCondiciones;
   if (totales !== undefined) ot.totales = totales;
   if (operatorNotes !== undefined) ot.operatorNotes = operatorNotes;
 
@@ -542,14 +560,20 @@ export async function updateStatus(req: Request, res: Response) {
     case 'control':
       // El stock permanece reservado mientras se realiza el control
       break;
+    case 'espera_reparto':
+      if (['en_progreso', 'pausada', 'control'].includes(ot.status)) {
+        await descontarStock(
+          sillas,
+          ot._id.toString(),
+          ot.items,
+          req.user?.userId,
+          req.user?.role
+        );
+      }
+      break;
+    case 'en_reparto':
+      break;
     case 'finalizada':
-      await descontarStock(
-        sillas,
-        ot._id.toString(),
-        ot.items,
-        req.user?.userId,
-        req.user?.role
-      );
       ot.finalizedAt = new Date();
       ot.finalizedBy = req.user?.userId as any;
       break;

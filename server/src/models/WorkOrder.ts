@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export type WorkOrderStatus = 'pendiente' | 'en_progreso' | 'pausada' | 'control' | 'finalizada' | 'cancelada';
+export type WorkOrderStatus = 'pendiente' | 'en_progreso' | 'pausada' | 'control' | 'espera_reparto' | 'en_reparto' | 'finalizada' | 'cancelada';
 
 export interface IWorkOrderSilla {
   chairTypeId: Types.ObjectId;

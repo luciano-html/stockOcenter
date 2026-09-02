@@ -46,6 +46,8 @@ import liveSeatRoutes from './routes/liveSeatRoutes';
 import pricingRoutes from './routes/pricingRoutes';
 import customerRoutes from './routes/customerRoutes';
 
+import deliveryRouteRoutes from './routes/deliveryRouteRoutes';
+
 app.use('/api/auth', authRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/componentes', componentRoutes);
@@ -55,6 +57,7 @@ app.use('/api/pricing', pricingRoutes);
 app.use('/api/ordenes-trabajo', workOrderRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/live-seats', liveSeatRoutes);
+app.use('/api/delivery-routes', deliveryRouteRoutes);
 
 
 app.use('/api/*', (_req, _res, next) => {

@@ -75,8 +75,10 @@ export interface WorkOrderSilla {
   quantity: number
 }
 
+export type WorkOrderStatus = 'pendiente' | 'en_progreso' | 'pausada' | 'control' | 'espera_reparto' | 'en_reparto' | 'finalizada' | 'cancelada';
+
 export interface WorkOrderStatusHistoryEntry {
-  status: 'pendiente' | 'en_progreso' | 'pausada' | 'control' | 'finalizada' | 'cancelada'
+  status: WorkOrderStatus
   at: string
   by?: { _id: string; name: string; role: string }
   notes?: string
@@ -145,7 +147,7 @@ export interface WorkOrder {
   sillas?: WorkOrderSilla[]
   chairTypeId?: { _id: string; name: string; precioVenta?: number; imageUrl?: string }
   quantity?: number
-  status: 'pendiente' | 'en_progreso' | 'pausada' | 'control' | 'finalizada' | 'cancelada'
+  status: WorkOrderStatus
   items?: { componentId: string; quantity: number; type: 'adicional' | 'repuesto' }[]
   statusHistory?: WorkOrderStatusHistoryEntry[]
   customerId?: Customer | string
@@ -347,5 +349,19 @@ export interface PricingOverviewResponse {
   config: PricingConfigData
   summary: PricingSummary
   sillas: PricingChairItem[]
+}
+
+
+export interface IDeliveryRoute {
+  _id: string;
+  routeNumber: string;
+  date: string;
+  driver: string;
+  assistant?: string;
+  orders: WorkOrder[];
+  status: 'en_curso' | 'finalizada';
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
