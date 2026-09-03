@@ -6,7 +6,7 @@ export interface IDeliveryRoute extends Document {
   driver: string;
   assistant?: string;
   orders: Types.ObjectId[];
-  status: 'en_curso' | 'finalizada';
+  status: 'pendiente' | 'en_curso' | 'finalizada';
   notes?: string;
   createdBy?: Types.ObjectId;
   createdAt: Date;
@@ -20,7 +20,7 @@ const deliveryRouteSchema = new Schema<IDeliveryRoute>(
     driver: { type: String, required: true },
     assistant: { type: String },
     orders: [{ type: Schema.Types.ObjectId, ref: 'WorkOrder', required: true }],
-    status: { type: String, enum: ['en_curso', 'finalizada'], default: 'en_curso' },
+    status: { type: String, enum: ['pendiente', 'en_curso', 'finalizada'], default: 'pendiente' },
     notes: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },

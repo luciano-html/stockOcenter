@@ -359,7 +359,7 @@ export interface IDeliveryRoute {
   driver: string;
   assistant?: string;
   orders: WorkOrder[];
-  status: 'en_curso' | 'finalizada';
+  status: 'pendiente' | 'en_curso' | 'finalizada';
   notes?: string;
   createdAt: string;
   updatedAt: string;

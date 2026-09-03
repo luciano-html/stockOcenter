@@ -29,6 +29,21 @@ export function useCreateDeliveryRoute() {
   })
 }
 
+// POST /api/delivery-routes/:id/start
+export function useStartDeliveryRoute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/delivery-routes/${id}/start`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deliveryRoutes'] })
+      queryClient.invalidateQueries({ queryKey: ['ordenes-trabajo'] })
+    },
+  })
+}
+
 // POST /api/delivery-routes/:id/finish
 export function useFinishDeliveryRoute() {
   const queryClient = useQueryClient()
@@ -40,7 +55,9 @@ export function useFinishDeliveryRoute() {
       id: string
       orderStatuses: { orderId: string; status: 'entregada' | 'rebotada'; notes?: string }[]
     }) => {
-      const res = await api.post(`/delivery-routes/${id}/finish`, { orderStatuses })
+      const deliveredOrders = orderStatuses.filter(o => o.status === 'entregada').map(o => ({ orderId: o.orderId }))
+      const returnedOrders = orderStatuses.filter(o => o.status === 'rebotada').map(o => ({ orderId: o.orderId, reason: o.notes }))
+      const res = await api.post(`/delivery-routes/${id}/finish`, { deliveredOrders, returnedOrders })
       return res.data
     },
     onSuccess: () => {

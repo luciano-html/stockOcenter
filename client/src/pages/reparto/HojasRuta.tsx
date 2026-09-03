@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { useDeliveryRoutes, useFinishDeliveryRoute } from '@/services/deliveryRoutes'
+import { useDeliveryRoutes, useFinishDeliveryRoute, useStartDeliveryRoute } from '@/services/deliveryRoutes'
 import type { IDeliveryRoute, WorkOrder } from '@/types'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
@@ -53,8 +53,12 @@ export function HojasRuta() {
                   </TableCell>
                   <TableCell className="text-center">{route.orders.length}</TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={route.status === 'en_curso' ? 'default' : 'secondary'} className={route.status === 'en_curso' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' : 'bg-gray-100 text-gray-800 hover:bg-gray-100'}>
-                      {route.status === 'en_curso' ? 'En Curso' : 'Finalizada'}
+                    <Badge variant="outline" className={
+                      route.status === 'en_curso' ? 'bg-blue-100 text-blue-800' :
+                      route.status === 'pendiente' ? 'bg-amber-100 text-amber-800' :
+                      'bg-gray-100 text-gray-800'
+                    }>
+                      {route.status === 'en_curso' ? 'En Curso' : route.status === 'pendiente' ? 'Programada' : 'Finalizada'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
@@ -81,6 +85,8 @@ export function HojasRuta() {
 
 function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: () => void }) {
   const { mutate: finishRoute, isPending } = useFinishDeliveryRoute()
+  const { mutate: startRoute, isPending: isStarting } = useStartDeliveryRoute()
+  const [formError, setFormError] = useState<string | null>(null)
   const [isFinishing, setIsFinishing] = useState(false)
   
   // orderStatuses state for finishing
@@ -95,7 +101,20 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
     window.print()
   }
 
+  const handleStartSubmit = () => {
+    setFormError(null)
+    startRoute(route._id, {
+      onSuccess: () => {
+        onClose()
+      },
+      onError: (err: any) => {
+        setFormError(err?.response?.data?.error?.message || err?.response?.data?.message || 'Error al iniciar la ruta')
+      }
+    })
+  }
+
   const handleFinishSubmit = () => {
+    setFormError(null)
     const statusesArray = Object.entries(orderStatuses).map(([orderId, data]) => ({
       orderId,
       status: data.status,
@@ -104,11 +123,10 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
 
     finishRoute({ id: route._id, orderStatuses: statusesArray }, {
       onSuccess: () => {
-        alert('Hoja de ruta finalizada correctamente')
         onClose()
       },
       onError: (err: any) => {
-        alert(err?.response?.data?.message || 'Error al finalizar')
+        setFormError(err?.response?.data?.error?.message || err?.response?.data?.message || 'Error al finalizar')
       }
     })
   }
@@ -129,7 +147,7 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
             <div><strong>Chofer:</strong> {route.driver}</div>
             <div><strong>Acompañante:</strong> {route.assistant || '-'}</div>
             <div><strong>Fecha:</strong> {new Date(route.date).toLocaleDateString()}</div>
-            <div><strong>Estado:</strong> {route.status === 'en_curso' ? 'En Curso' : 'Finalizada'}</div>
+            <div><strong>Estado:</strong> {route.status === 'en_curso' ? 'En Curso' : route.status === 'pendiente' ? 'Programada' : 'Finalizada'}</div>
           </div>
 
           <div>
@@ -199,14 +217,29 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
             </div>
           </div>
 
-          {route.status === 'en_curso' && (
-            <div className="flex justify-end pt-4 border-t print:hidden">
-              {!isFinishing ? (
+          {(route.status === 'en_curso' || route.status === 'pendiente') && (
+            <div className="flex flex-col items-end gap-3 pt-4 border-t print:hidden">
+              {formError && (
+                <div className="w-full bg-red-50 text-red-700 border border-red-200 p-3 rounded-md text-sm font-medium flex justify-between items-center">
+                  <span>{formError}</span>
+                  <button onClick={() => setFormError(null)} className="text-red-500 hover:text-red-900 font-bold px-2">&times;</button>
+                </div>
+              )}
+              
+              {route.status === 'pendiente' && (
+                <Button onClick={handleStartSubmit} disabled={isStarting} className="bg-blue-600 hover:bg-blue-700">
+                  {isStarting ? 'Iniciando...' : 'Iniciar Reparto'}
+                </Button>
+              )}
+
+              {route.status === 'en_curso' && !isFinishing && (
                 <Button onClick={() => setIsFinishing(true)}>Finalizar Reparto...</Button>
-              ) : (
+              )}
+              
+              {route.status === 'en_curso' && isFinishing && (
                 <div className="flex space-x-3">
                   <Button variant="outline" onClick={() => setIsFinishing(false)} disabled={isPending}>Cancelar</Button>
-                  <Button onClick={handleFinishSubmit} disabled={isPending}>
+                  <Button onClick={handleFinishSubmit} disabled={isPending} className="bg-green-600 hover:bg-green-700">
                     {isPending ? 'Guardando...' : 'Confirmar Finalización'}
                   </Button>
                 </div>

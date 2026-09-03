@@ -1,4 +1,4 @@
-﻿import { Request, Response } from 'express';
+import { Request, Response } from 'express';
 import { DeliveryRoute, WorkOrder } from '../models';
 import { ApiError } from '../utils/ApiError';
 
@@ -39,6 +39,19 @@ export async function create(req: Request, res: Response) {
 
   const populated = await DeliveryRoute.findById(route._id).populate(POPULATE_OPTIONS).lean();
   res.status(201).json({ data: populated });
+}
+
+export async function startRoute(req: Request, res: Response) {
+  const { id } = req.params;
+  const route = await DeliveryRoute.findById(id);
+  if (!route) throw ApiError.notFound('Ruta no encontrada');
+  if (route.status !== 'pendiente') throw ApiError.badRequest('La ruta ya fue iniciada o finalizada');
+
+  route.status = 'en_curso';
+  await route.save();
+
+  const populated = await DeliveryRoute.findById(route._id).populate(POPULATE_OPTIONS).lean();
+  res.json({ data: populated });
 }
 
 export async function finishRoute(req: Request, res: Response) {
