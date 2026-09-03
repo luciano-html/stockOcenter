@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getOrdenSillasLabel } from '@/lib/ordenes'
 import { useCreateDeliveryRoute } from '@/services/deliveryRoutes'
+import { AlertTriangle } from 'lucide-react'
 
 export function ColaReparto() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -123,7 +124,19 @@ export function ColaReparto() {
                     />
                   </TableCell>
                   <TableCell className="font-medium text-gray-900">#{ot.orderNumber || ot._id.slice(-6).toUpperCase()}</TableCell>
-                  <TableCell>{ot.cliente?.name || 'Consumidor Final'}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{ot.cliente?.name || 'Consumidor Final'}</span>
+                      {ot.condicionesComerciales?.observacionesReparto && (
+                        <span className="text-xs text-red-600 bg-red-50 p-1 rounded mt-1 border border-red-100 flex items-start gap-1">
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                          <span className="truncate max-w-[200px]" title={ot.condicionesComerciales.observacionesReparto}>
+                            {ot.condicionesComerciales.observacionesReparto}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-gray-600 max-w-[200px] truncate" title={getOrdenSillasLabel(ot)}>
                     {getOrdenSillasLabel(ot)}
                   </TableCell>

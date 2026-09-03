@@ -74,20 +74,31 @@ export async function finishRoute(req: Request, res: Response) {
   // Handle Returned
   if (returnedOrders && Array.isArray(returnedOrders)) {
     for (const ret of returnedOrders) {
-      await WorkOrder.updateOne(
-        { _id: ret.orderId },
-        { 
-          $set: { status: 'espera_reparto' },
-          $push: {
-            statusHistory: {
+      const order = await WorkOrder.findById(ret.orderId);
+      if (order) {
+        const dateStr = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+        const prefix = `[REBOTADA ${dateStr}${ret.reason ? `: ${ret.reason}` : ''}]`;
+        const existingObs = order.condicionesComerciales?.observacionesReparto || '';
+        const newObs = existingObs ? `${prefix} - ${existingObs}` : prefix;
+
+        await WorkOrder.updateOne(
+          { _id: ret.orderId },
+          { 
+            $set: { 
               status: 'espera_reparto',
-              at: new Date(),
-              by: req.user?.userId,
-              notes: ret.reason ? `Devolución de Reparto: ${ret.reason}` : 'Devolución de Reparto'
+              'condicionesComerciales.observacionesReparto': newObs
+            },
+            $push: {
+              statusHistory: {
+                status: 'espera_reparto',
+                at: new Date(),
+                by: req.user?.userId,
+                notes: ret.reason ? `Devolución de Reparto: ${ret.reason}` : 'Devolución de Reparto'
+              }
             }
           }
-        }
-      );
+        );
+      }
     }
   }
 
