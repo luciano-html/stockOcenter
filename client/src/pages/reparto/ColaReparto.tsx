@@ -122,7 +122,7 @@ export function ColaReparto() {
                       onChange={() => handleToggleSelect(ot._id)}
                     />
                   </TableCell>
-                  <TableCell className="font-medium text-gray-900">{ot.orderNumber}</TableCell>
+                  <TableCell className="font-medium text-gray-900">#{ot.orderNumber || ot._id.slice(-6).toUpperCase()}</TableCell>
                   <TableCell>{ot.cliente?.name || 'Consumidor Final'}</TableCell>
                   <TableCell className="text-gray-600 max-w-[200px] truncate" title={getOrdenSillasLabel(ot)}>
                     {getOrdenSillasLabel(ot)}

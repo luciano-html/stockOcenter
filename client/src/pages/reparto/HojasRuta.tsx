@@ -135,7 +135,7 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
     <Dialog open={true} onOpenChange={(open) => !open && onClose()} className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
-            <span>Hoja de Ruta #{route.routeNumber}</span>
+            <span>Reparto #{route.routeNumber}</span>
             <Button variant="outline" size="sm" onClick={handlePrint} className="print:hidden">
               <Printer className="w-4 h-4 mr-2" /> Imprimir
             </Button>
@@ -147,7 +147,7 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
             <div><strong>Chofer:</strong> {route.driver}</div>
             <div><strong>Acompañante:</strong> {route.assistant || '-'}</div>
             <div><strong>Fecha:</strong> {new Date(route.date).toLocaleDateString()}</div>
-            <div><strong>Estado:</strong> {route.status === 'en_curso' ? 'En Curso' : route.status === 'pendiente' ? 'Programada' : 'Finalizada'}</div>
+            <div className="print:hidden"><strong>Estado:</strong> {route.status === 'en_curso' ? 'En Curso' : route.status === 'pendiente' ? 'Programada' : 'Finalizada'}</div>
           </div>
 
           <div>
@@ -156,7 +156,7 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
               {route.orders.map((ot: WorkOrder) => (
                 <div key={ot._id} className="border rounded-lg p-4 bg-white shadow-sm break-inside-avoid">
                   <div className="flex justify-between items-start mb-2">
-                    <div className="font-medium text-lg">Nº OT: {ot.orderNumber}</div>
+                    <div className="font-medium text-lg">Nº OT: #{ot.orderNumber || ot._id.slice(-6).toUpperCase()}</div>
                     <div className="text-gray-500 text-sm">Cliente: <span className="font-semibold text-gray-900">{ot.cliente?.name || 'Consumidor Final'}</span></div>
                   </div>
                   
