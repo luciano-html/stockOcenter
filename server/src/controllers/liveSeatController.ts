@@ -193,9 +193,9 @@ export const purchase = async (req: Request, res: Response) => {
       turnoEntrega: logistica.turnoEntrega || 'Indistinto',
     },
     condicionesComerciales: {
-      formaPago: 'Tienda E-commerce',
+      formaPago: req.body.condicionesComerciales?.formaPago || 'Tienda E-commerce',
       observacionesFactura: observaciones,
-      observacionesReparto: logistica.observacionesReparto,
+      observacionesReparto: req.body.condicionesComerciales?.observacionesReparto || logistica.observacionesReparto,
     },
     totales: {
       subtotalVenta: total,

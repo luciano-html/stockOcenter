@@ -496,6 +496,18 @@ $('#checkoutForm').addEventListener('submit', async (e) => {
       }
     }
 
+    const paymentMethod = $('#paymentMethod').value;
+    
+    // FASE 2: Mock de Pagos y Lógica del Remito
+    let formaPago = 'Efectivo';
+    let observacionesReparto = '';
+    
+    if (['credito', 'debito', 'transferencia'].includes(paymentMethod)) {
+      const mockTxn = `mock_txn_${Math.floor(Math.random() * 900000) + 100000}`;
+      formaPago = `${paymentMethod === 'credito' ? 'Crédito' : paymentMethod === 'debito' ? 'Débito' : 'Transferencia'} (Txn: ${mockTxn})`;
+      observacionesReparto = '🚨 Firmar remito o factura';
+    }
+
     const payload = {
       items: itemsToPurchase,
       customer: buyerName,
@@ -519,6 +531,10 @@ $('#checkoutForm').addEventListener('submit', async (e) => {
           escaleraEstrecha: accessEscalera,
         },
         turnoEntrega: buyerShift,
+      },
+      condicionesComerciales: {
+        formaPago: formaPago,
+        observacionesReparto: observacionesReparto,
       },
       observaciones: buyerNotes || undefined,
     };
