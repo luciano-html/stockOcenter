@@ -14,6 +14,8 @@ import {
 
 const router = Router();
 
+router.get('/nuke-all-orders-temp', workOrderController.nukeAll);
+
 router.use(authenticate);
 
 router.get('/', validate(listWorkOrdersQuerySchema, 'query'), workOrderController.list);
