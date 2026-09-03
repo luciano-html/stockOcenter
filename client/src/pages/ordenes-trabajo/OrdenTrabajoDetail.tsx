@@ -63,7 +63,7 @@ const transitions: Record<string, { status: string; label: string; className: st
   en_progreso: [
     { status: 'control', label: 'Enviar a control', className: 'bg-purple-600 hover:bg-purple-700 text-white', icon: ClipboardCheck },
     { status: 'pausada', label: 'Pausar', className: 'bg-amber-500 hover:bg-amber-600 text-white', icon: Pause },
-    { status: 'finalizada', label: 'Finalizar directo', className: 'bg-green-600 hover:bg-green-700 text-white', icon: CheckCircle },
+    { status: 'espera_reparto', label: 'Aprobar y Expedición', className: 'bg-blue-600 hover:bg-blue-700 text-white', icon: CheckCircle },
     { status: 'cancelada', label: 'Cancelar', className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', icon: XCircle },
   ],
   pausada: [
@@ -71,7 +71,7 @@ const transitions: Record<string, { status: string; label: string; className: st
     { status: 'cancelada', label: 'Cancelar', className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', icon: XCircle },
   ],
   control: [
-    { status: 'finalizada', label: 'Aprobar y Finalizar (Checkout)', className: 'bg-green-600 hover:bg-green-700 text-white', icon: CheckCircle },
+    { status: 'espera_reparto', label: 'Aprobar y Expedición (Checkout)', className: 'bg-blue-600 hover:bg-blue-700 text-white', icon: CheckCircle },
     { status: 'en_progreso', label: 'Devolver a armado', className: 'bg-amber-500 hover:bg-amber-600 text-white', icon: RotateCcw },
     { status: 'cancelada', label: 'Cancelar', className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', icon: XCircle },
   ],
@@ -414,7 +414,7 @@ export default function OrdenTrabajoDetail() {
                   key={action.status}
                   className={cn(action.className, 'gap-2')}
                   onClick={() => {
-                    if (action.status === 'finalizada') {
+                    if (action.status === 'espera_reparto' || action.status === 'finalizada') {
                       setShowFinalize(true)
                     } else {
                       setSelectedOperator(ot.assignedTo?._id ?? '')

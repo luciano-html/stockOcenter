@@ -1,5 +1,5 @@
 const state = {
-  apiBase: 'https://stockocenter.onrender.com',
+  apiBase: localStorage.getItem('tienda_api_base') || 'https://stockocenter.onrender.com',
   productos: [],
   cart: JSON.parse(localStorage.getItem('tienda_cart') || '[]'),
   activeCategory: 'all',

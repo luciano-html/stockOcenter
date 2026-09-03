@@ -89,5 +89,5 @@ export const assignWorkOrderSchema = z.object({
 export const listWorkOrdersQuerySchema = z.object({
   estado: z.enum(['pendiente', 'en_progreso', 'pausada', 'control', 'espera_reparto', 'en_reparto', 'finalizada', 'cancelada']).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(1000).default(50),
 });

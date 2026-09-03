@@ -18,7 +18,8 @@ export function useCreateDeliveryRoute() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: { driver: string; assistant?: string; orders: string[]; notes?: string }) => {
-      const res = await api.post('/delivery-routes', data)
+      const payload = { ...data, orderIds: data.orders }
+      const res = await api.post('/delivery-routes', payload)
       return res.data
     },
     onSuccess: () => {

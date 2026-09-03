@@ -107,7 +107,7 @@ const workOrderStatusEntrySchema = new Schema<IWorkOrderStatusEntry>(
     status: {
       type: String,
       required: true,
-      enum: ['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada'],
+      enum: ['pendiente', 'en_progreso', 'pausada', 'control', 'espera_reparto', 'en_reparto', 'finalizada', 'cancelada'],
     },
     at: { type: Date, required: true },
     by: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -126,7 +126,7 @@ const workOrderSchema = new Schema<IWorkOrder>(
     status: {
       type: String,
       required: true,
-      enum: ['pendiente', 'en_progreso', 'pausada', 'control', 'finalizada', 'cancelada'],
+      enum: ['pendiente', 'en_progreso', 'pausada', 'control', 'espera_reparto', 'en_reparto', 'finalizada', 'cancelada'],
       default: 'pendiente',
       index: true,
     },

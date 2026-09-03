@@ -11,19 +11,21 @@ import { getOrdenSillasLabel } from '@/lib/ordenes'
 import { useCreateDeliveryRoute } from '@/services/deliveryRoutes'
 
 export function ColaReparto() {
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [driver, setDriver] = useState('')
+  const [assistant, setAssistant] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formSuccess, setFormSuccess] = useState<string | null>(null)
+
   const { data: workOrders, isLoading, error } = useQuery<{ data: WorkOrder[] }>({
     queryKey: ['ordenes-trabajo', { estado: 'espera_reparto' }],
     queryFn: async () => {
-      const res = await api.get('/ordenes-trabajo', { params: { estado: 'espera_reparto', limit: 1000 } })
+      const res = await api.get('/ordenes-trabajo', { params: { estado: 'espera_reparto', limit: 100 } })
       return res.data
     },
   })
 
   const { mutate: createRoute, isPending: isCreating } = useCreateDeliveryRoute()
-
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [driver, setDriver] = useState('')
-  const [assistant, setAssistant] = useState('')
 
   const orderList = workOrders?.data || []
 
@@ -34,8 +36,10 @@ export function ColaReparto() {
   }
 
   const handleCreateRoute = () => {
-    if (!driver.trim()) return alert('Debe ingresar el nombre del chofer.')
-    if (selectedIds.length === 0) return alert('Debe seleccionar al menos una orden.')
+    setFormError(null)
+    setFormSuccess(null)
+    if (!driver.trim()) return setFormError('Debe ingresar el nombre del chofer.')
+    if (selectedIds.length === 0) return setFormError('Debe seleccionar al menos una orden.')
     
     createRoute({
       driver,
@@ -46,10 +50,11 @@ export function ColaReparto() {
         setDriver('')
         setAssistant('')
         setSelectedIds([])
-        alert('Hoja de Ruta creada exitosamente.')
+        setFormSuccess('Hoja de Ruta creada exitosamente.')
+        setTimeout(() => setFormSuccess(null), 3000)
       },
       onError: (err: any) => {
-        alert(err?.response?.data?.message || 'Error al crear la hoja de ruta')
+        setFormError(err?.response?.data?.error?.message || err?.response?.data?.message || 'Error al crear la hoja de ruta')
       }
     })
   }
@@ -74,6 +79,18 @@ export function ColaReparto() {
           </Button>
         </div>
       </div>
+
+      {formError && (
+        <div className="bg-red-50 text-red-700 border border-red-200 p-3 rounded-md text-sm font-medium flex justify-between items-center">
+          <span>{formError}</span>
+          <button onClick={() => setFormError(null)} className="text-red-500 hover:text-red-900 font-bold px-2">&times;</button>
+        </div>
+      )}
+      {formSuccess && (
+        <div className="bg-green-50 text-green-700 border border-green-200 p-3 rounded-md text-sm font-medium">
+          {formSuccess}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow border overflow-hidden">
         <Table>

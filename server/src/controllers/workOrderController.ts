@@ -434,13 +434,13 @@ export async function finalizar(req: Request, res: Response) {
     req.user?.role
   );
 
-  ot.status = 'finalizada';
+  ot.status = 'espera_reparto';
   ot.finalizedAt = new Date();
   ot.finalizedBy = req.user?.userId as any;
   ot.operatorNotes = notas?.trim() || undefined;
   ot.statusHistory = ot.statusHistory ?? [];
   ot.statusHistory.push({
-    status: 'finalizada',
+    status: 'espera_reparto',
     at: new Date(),
     by: req.user?.userId as any,
     notes: notas?.trim() || undefined,

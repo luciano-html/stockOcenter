@@ -45,7 +45,7 @@ export default function StockArmadoView() {
   }
 
   if (error) {
-    return <div className="text-red-500 p-4 md:p-8">Error al cargar datos.</div>
+    return <div className="text-red-500 p-4 md:p-8">Error al cargar datos: {error instanceof Error ? error.message : JSON.stringify(error)}</div>
   }
 
   return (
