@@ -16,27 +16,6 @@ import { getPagination, getSkip } from '../utils/pagination';
 import { createAuditLog } from '../services/auditService';
 import { invalidateStockCache } from '../services/stockService';
 
-export async function nukeAll(req: Request, res: Response) {
-  // Temporary endpoint to delete all orders and reset stock
-  const txs = await StockTransaction.find({ referenceType: 'work-order' }).lean();
-  for (const tx of txs) {
-    const isEgreso = tx.type === 'consumo_orden' || tx.type === 'egreso';
-    for (const item of tx.items) {
-      if (isEgreso) {
-        await Component.updateOne({ _id: item.componentId }, { $inc: { stock: item.quantity } });
-      } else {
-        await Component.updateOne({ _id: item.componentId }, { $inc: { stock: -item.quantity } });
-      }
-    }
-  }
-  await Component.updateMany({}, { $set: { reserved: 0 } });
-  await StockTransaction.deleteMany({ referenceType: 'work-order' });
-  await WorkOrder.deleteMany({});
-  await DeliveryRoute.deleteMany({});
-  invalidateStockCache();
-  res.json({ message: 'Todas las órdenes y transacciones eliminadas' });
-}
-
 const USER_POPULATE = {
   path: 'createdBy updatedBy startedBy finalizedBy assignedTo statusHistory.by',
   select: 'name role',
