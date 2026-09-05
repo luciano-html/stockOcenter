@@ -27,4 +27,8 @@ export class ApiError extends Error {
   static conflict(message: string) {
     return new ApiError(409, message);
   }
+
+  static internal(message = 'Error interno del servidor', details?: unknown) {
+    return new ApiError(500, message, details);
+  }
 }

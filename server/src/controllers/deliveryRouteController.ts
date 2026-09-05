@@ -223,3 +223,37 @@ export async function updateStopStatus(req: Request, res: Response) {
   const populated = await DeliveryRoute.findById(route._id).populate(POPULATE_OPTIONS).lean();
   res.json({ data: populated });
 }
+
+export async function reorderStops(req: Request, res: Response) {
+  const { id } = req.params;
+  const { stopIds } = req.body;
+
+  const route = await DeliveryRoute.findById(id);
+  if (!route) throw ApiError.notFound('Ruta no encontrada');
+  if (route.status !== 'pendiente') {
+    throw ApiError.badRequest('Solo se pueden reordenar paradas en rutas pendientes');
+  }
+
+  if (!Array.isArray(stopIds) || stopIds.length !== route.stops.length) {
+    throw ApiError.badRequest('La lista de paradas no coincide con las paradas de la ruta');
+  }
+
+  const newStops = stopIds.map((orderId: string, index: number) => {
+    const existing = route.stops.find(s => s.orderId.toString() === orderId);
+    if (!existing) throw ApiError.badRequest(`Parada ${orderId} no pertenece a la ruta`);
+    return {
+      orderId: existing.orderId,
+      sequence: index,
+      status: existing.status,
+      arrivalTime: existing.arrivalTime,
+      departureTime: existing.departureTime,
+      reason: existing.reason,
+    };
+  });
+
+  route.stops = newStops as any;
+  await route.save();
+
+  const populated = await DeliveryRoute.findById(route._id).populate(POPULATE_OPTIONS).lean();
+  res.json({ data: populated });
+}

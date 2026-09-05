@@ -43,7 +43,7 @@ export function HojasRuta() {
                 </TableCell>
               </TableRow>
             ) : (
-              routeList.map((route) => (
+              routeList.map((route: IDeliveryRoute) => (
                 <TableRow key={route._id}>
                   <TableCell className="font-medium">{route.routeNumber}</TableCell>
                   <TableCell>{new Date(route.date).toLocaleDateString()}</TableCell>

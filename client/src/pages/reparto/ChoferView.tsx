@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { MapPin, Navigation, CheckCircle, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
-import { IDeliveryRoute } from '@/types'
+import type { IDeliveryRoute } from '@/types'
 
 export function ChoferView() {
   const { id } = useParams()
