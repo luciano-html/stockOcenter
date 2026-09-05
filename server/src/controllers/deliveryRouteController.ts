@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { DeliveryRoute, WorkOrder } from '../models';
 import { ApiError } from '../utils/ApiError';
 import { sendEmail } from '../services/emailService';
+import { optimizeRouteStops } from '../services/googleMapsService';
 
 const POPULATE_OPTIONS = [
   { path: 'stops.orderId', populate: { path: 'sillas.chairTypeId chairTypeId items.componentId' } },
@@ -30,7 +31,34 @@ export async function create(req: Request, res: Response) {
     { $set: { status: 'en_reparto' } }
   );
 
-  const stops = orderIds.map((orderId, index) => ({
+  const orders = await WorkOrder.find({ _id: { $in: orderIds } });
+  
+  // Extract addresses
+  const originAddress = 'Buenos Aires, Argentina'; // FIXME: Replace with real warehouse origin
+  const waypoints = orderIds.map(id => {
+    const order = orders.find(o => o._id.toString() === id.toString());
+    if (order?.logistica?.direccionEntrega && order?.logistica?.localidadEntrega) {
+      return `${order.logistica.direccionEntrega}, ${order.logistica.localidadEntrega}, Buenos Aires, Argentina`;
+    }
+    return ''; // Will be skipped or error on Google Maps API
+  }).filter(Boolean);
+
+  let optimizedIndices = Array.from({ length: orderIds.length }, (_, i) => i);
+  if (waypoints.length >= 2 && process.env.GOOGLE_MAPS_API_KEY) {
+    try {
+      optimizedIndices = await optimizeRouteStops(originAddress, waypoints);
+    } catch (err) {
+      console.warn('Google Maps optimization failed, using default order:', err);
+    }
+  }
+
+  // Create stops based on optimized order, or original order if optimization failed/was skipped.
+  // Google returns an array of indices [2, 0, 1] meaning the first stop should be the item originally at index 2.
+  const optimizedOrderIds = optimizedIndices.length === orderIds.length 
+    ? optimizedIndices.map(idx => orderIds[idx]) 
+    : orderIds; // Fallback
+
+  const stops = optimizedOrderIds.map((orderId, index) => ({
     orderId,
     sequence: index,
     status: 'pendiente'
