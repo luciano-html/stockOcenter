@@ -22,6 +22,8 @@ const RankingSillas = lazy(() => import('@/pages/ranking/RankingSillas'))
 const StockArmadoView = lazy(() => import('@/pages/stock/StockArmadoView'))
 const RepartoView = lazy(() => import('@/pages/reparto/RepartoView'))
 
+const ChoferView = lazy(() => import('@/pages/reparto/ChoferView').then(m => ({ default: m.ChoferView })))
+
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<Skeleton className="h-96" />}>{children}</Suspense>
 }
@@ -30,6 +32,10 @@ const router = createBrowserRouter([
   {
     path: '/login',
     element: <SuspenseWrapper><Login /></SuspenseWrapper>,
+  },
+  {
+    path: '/modo-chofer/:id',
+    element: <ProtectedRoute><SuspenseWrapper><ChoferView /></SuspenseWrapper></ProtectedRoute>,
   },
   {
     path: '/',

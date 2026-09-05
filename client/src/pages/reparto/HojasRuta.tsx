@@ -51,7 +51,7 @@ export function HojasRuta() {
                     {route.driver}
                     {route.assistant ? <span className="text-gray-500 text-sm block">/ {route.assistant}</span> : null}
                   </TableCell>
-                  <TableCell className="text-center">{route.orders.length}</TableCell>
+                  <TableCell className="text-center">{route.stops.length}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className={
                       route.status === 'en_curso' ? 'bg-blue-100 text-blue-800' :
@@ -91,8 +91,9 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
   
   // orderStatuses state for finishing
   const [orderStatuses, setOrderStatuses] = useState<Record<string, { status: 'entregada' | 'rebotada'; notes: string }>>(
-    route.orders.reduce((acc, order) => {
-      acc[order._id] = { status: 'entregada', notes: '' }
+    route.stops.reduce((acc, stop) => {
+      const otId = typeof stop.orderId === 'object' ? (stop.orderId as any)._id : stop.orderId;
+      acc[otId] = { status: 'entregada', notes: '' }
       return acc
     }, {} as Record<string, { status: 'entregada' | 'rebotada'; notes: string }>)
   )
@@ -136,9 +137,14 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
             <span>Reparto #{route.routeNumber}</span>
-            <Button variant="outline" size="sm" onClick={handlePrint} className="print:hidden">
-              <Printer className="w-4 h-4 mr-2" /> Imprimir
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => window.open(`/modo-chofer/${route._id}`, '_blank')} className="print:hidden">
+                📱 Link Chofer
+              </Button>
+              <Button variant="outline" size="sm" onClick={handlePrint} className="print:hidden">
+                <Printer className="w-4 h-4 mr-2" /> Imprimir
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -151,10 +157,12 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
           </div>
 
           <div>
-            <h3 className="font-semibold mb-3">Órdenes a entregar ({route.orders.length})</h3>
+            <h3 className="font-semibold mb-3">Órdenes a entregar ({route.stops.length})</h3>
             <div className="space-y-4">
-              {route.orders.map((ot: WorkOrder) => (
-                <div key={ot._id} className="border rounded-lg p-4 bg-white shadow-sm break-inside-avoid">
+              {route.stops.map((stop: any) => {
+                const ot: WorkOrder = stop.orderId;
+                return (
+                <div key={stop._id || ot._id} className="border rounded-lg p-4 bg-white shadow-sm break-inside-avoid">
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-medium text-lg">Nº OT: #{ot.orderNumber || ot._id.slice(-6).toUpperCase()}</div>
                     <div className="text-gray-500 text-sm">Cliente: <span className="font-semibold text-gray-900">{ot.cliente?.name || 'Consumidor Final'}</span></div>
@@ -213,7 +221,7 @@ function RouteDetailModal({ route, onClose }: { route: IDeliveryRoute; onClose: 
                     </div>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 

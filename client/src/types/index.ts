@@ -352,13 +352,23 @@ export interface PricingOverviewResponse {
 }
 
 
+export interface IStop {
+  _id: string;
+  orderId: WorkOrder | string; // Populated as WorkOrder
+  sequence: number;
+  status: 'pendiente' | 'en_camino' | 'llegue' | 'entregado' | 'rebotado';
+  arrivalTime?: string;
+  departureTime?: string;
+  reason?: string;
+}
+
 export interface IDeliveryRoute {
   _id: string;
   routeNumber: string;
   date: string;
   driver: string;
   assistant?: string;
-  orders: WorkOrder[];
+  stops: IStop[];
   status: 'pendiente' | 'en_curso' | 'finalizada';
   notes?: string;
   createdAt: string;

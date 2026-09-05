@@ -14,5 +14,6 @@ router.get('/:id', deliveryRouteController.get);
 router.post('/', authorize('admin'), validate(createDeliveryRouteSchema), deliveryRouteController.create);
 router.post('/:id/start', authorize('admin'), deliveryRouteController.startRoute);
 router.post('/:id/finish', authorize('admin'), validate(finishDeliveryRouteSchema), deliveryRouteController.finishRoute);
+router.put('/:id/stops/:stopId', deliveryRouteController.updateStopStatus);
 
 export default router;
