@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { ApiError } from '../utils/ApiError';
 
 export async function optimizeRouteStops(origin: string, waypoints: string[]) {
@@ -18,30 +17,38 @@ export async function optimizeRouteStops(origin: string, waypoints: string[]) {
   }));
 
   try {
-    const response = await axios.post(
+    const response = await fetch(
       'https://routes.googleapis.com/directions/v2:computeRoutes',
       {
-        origin: { address: origin },
-        destination: { address: origin }, // Retornar al origen
-        intermediates: intermediates,
-        travelMode: 'DRIVE',
-        routingPreference: 'TRAFFIC_AWARE',
-        optimizeWaypointOrder: true
-      },
-      {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': apiKey,
           'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex,routes.distanceMeters,routes.duration',
           'X-Goog-Maps-Solution-ID': 'gmp_git_agentskills_v1'
-        }
+        },
+        body: JSON.stringify({
+          origin: { address: origin },
+          destination: { address: origin }, // Retornar al origen
+          intermediates: intermediates,
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_AWARE',
+          optimizeWaypointOrder: true
+        })
       }
     );
 
-    const optimizedIndices = response.data.routes[0]?.optimizedIntermediateWaypointIndex || [];
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Error optimizing route from Google Maps API:', response.status, errText);
+      throw new Error(`Google Maps API error: ${response.status}`);
+    }
+
+    const data: any = await response.json();
+    const optimizedIndices = data.routes?.[0]?.optimizedIntermediateWaypointIndex || [];
     return optimizedIndices;
   } catch (error: any) {
-    console.error('Error optimizing route', error.response?.data || error.message);
+    console.error('Error optimizing route', error?.message || error);
     throw ApiError.internal('Error al optimizar la ruta con Google Maps');
   }
 }

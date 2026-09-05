@@ -73,7 +73,6 @@ export async function create(req: Request, res: Response) {
   });
 
   // Send Email (Trigger 1)
-  const orders = await WorkOrder.find({ _id: { $in: orderIds } });
   for (const order of orders) {
     if (order.cliente?.email) {
       sendEmail(
